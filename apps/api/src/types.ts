@@ -24,15 +24,21 @@ export interface ReferralSummary {
   owner: string;
 }
 
-export interface MerchantDashboard {
+export interface DashboardTotals {
+  totalOrders: number;
+  pendingOrders: number;
+  totalReferralUses: number;
+  totalPointsOutstanding: number;
+}
+
+export interface DashboardPayload {
   merchant: MerchantSummary;
-  totals: {
-    totalOrders: number;
-    pendingOrders: number;
-    totalReferralUses: number;
-    totalPointsOutstanding: number;
-  };
+  totals: DashboardTotals;
   recentOrders: OrderSummary[];
   topReferrals: ReferralSummary[];
   refreshedAt: string;
+}
+
+export interface DatabaseSchema {
+  dashboard: DashboardPayload;
 }

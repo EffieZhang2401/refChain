@@ -1,0 +1,70 @@
+{
+  "dashboard": {
+    "merchant": {
+      "id": "mrc_demo_001",
+      "name": "RefChain Studio",
+      "cashback_percentage": 5,
+      "referral_reward_percentage": 2,
+      "industry": "Lifestyle"
+    },
+    "totals": {
+      "totalOrders": 182,
+      "pendingOrders": 4,
+      "totalReferralUses": 57,
+      "totalPointsOutstanding": 12950
+    },
+    "recentOrders": [
+      {
+        "id": "ord_demo_001",
+        "order_code": "ORD-1A2B3C",
+        "amount": 249.5,
+        "currency": "USD",
+        "cashback_points": 12,
+        "referral_points": 5,
+        "status": "completed",
+        "created_at": "2025-03-11T10:22:00.000Z"
+      },
+      {
+        "id": "ord_demo_002",
+        "order_code": "ORD-4D5E6F",
+        "amount": 540,
+        "currency": "USD",
+        "cashback_points": 27,
+        "referral_points": 10,
+        "status": "processing",
+        "created_at": "2025-03-10T15:44:00.000Z"
+      },
+      {
+        "id": "ord_demo_003",
+        "order_code": "ORD-7G8H9I",
+        "amount": 120,
+        "currency": "USD",
+        "cashback_points": 6,
+        "referral_points": 0,
+        "status": "completed",
+        "created_at": "2025-03-09T09:02:00.000Z"
+      }
+    ],
+    "topReferrals": [
+      {
+        "id": "ref_demo_001",
+        "code": "RC-ALPHA",
+        "usage_count": 19,
+        "owner": "Luna"
+      },
+      {
+        "id": "ref_demo_002",
+        "code": "RC-BETA",
+        "usage_count": 14,
+        "owner": "Miles"
+      },
+      {
+        "id": "ref_demo_003",
+        "code": "RC-GAMMA",
+        "usage_count": 9,
+        "owner": "Ravi"
+      }
+    ],
+    "refreshedAt": "2025-03-11T10:35:00.000Z"
+  }
+}

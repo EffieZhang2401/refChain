@@ -1,62 +1,53 @@
 # RefChain MVP
 
-RefChain is a Supabase + Magic.link + Polygon powered referral and loyalty MVP for multi-merchant brands.
+RefChain now ships with a **minimal JSON驱动 demo**，方便你在本地快速体验前后端联动，无需搭建 Supabase、Magic.link 或 Polygon 节点。完整的 Web3 版架构依旧保存在 `docs/architecture.md`，随时可以在此基础上扩展。
 
-## Architecture Snapshot
-- **Web** – Next.js 14 (App Router) with Tailwind CSS, SWR for data fetching, and Magic.link for passwordless wallet-ready auth.
-- **API** – Express + Zod + Supabase service client acting as the single data gateway, orchestrating loyalty logic and blockchain sync tasks.
-- **Smart contracts** – Hardhat + Solidity ERC-1155 (MultiMerchantPoints) deployed to Polygon Amoy for transparent point issuance.
-- **Data** – Supabase/PostgreSQL stores profiles, merchants, referral links, orders, the points ledger, and blockchain sync tasks.
+## 架构速览（Mini 版本）
+- **Web**：Next.js 14 + Tailwind CSS，直接请求本地 API。
+- **API**：Express 4，所有数据均从 `apps/api/db.json` 读取。
+- **Data**：单个 JSON 文件即“数据库”，改完即可立即看到 UI 变化。
+- **Contracts**：Hardhat/ERC-1155 脚手架依然保留，等需要链上功能时再启用。
 
-## Repository Layout
+## 仓库结构
 ```
 .
 ├── apps
-│   ├── api        # Express + Supabase service
-│   └── web        # Next.js dashboard
-├── contracts      # Hardhat + ERC-1155
-├── docs           # High level design notes
-├── supabase       # SQL schema & seeds
-├── package.json   # npm workspaces entry point
+│   ├── api        # 轻量 Express API（读取 db.json）
+│   └── web        # Next.js 仪表盘
+├── contracts      # Hardhat + ERC-1155（可选）
+├── docs           # 完整架构说明
+├── supabase       # 原始 SQL schema
+├── package.json   # npm workspaces
 └── README.md
 ```
 
-## Quick start
-1. Copy `.env.example` to `.env` and provide Supabase, Magic.link, and Polygon Amoy credentials.
-2. Install dependencies:
+## 快速运行（JSON Demo）
+1. 复制 `.env.example` → `.env`（只需要 `PORT` 与 `NEXT_PUBLIC_API_BASE_URL`）。
+2. 安装依赖：
    ```bash
    npm install
    npm --workspace apps/api install
    npm --workspace apps/web install
-   npm --workspace contracts install
    ```
-3. Start services:
+3. 根据需要编辑 `apps/api/db.json`（示例数据已内置）。
+4. 分别启动后端与前端：
    ```bash
-   npm run dev:api
-   npm run dev:web
+   npm run dev:api    # http://localhost:4000
+   npm run dev:web    # http://localhost:3000
    ```
-4. Deploy / test the contract layer via Hardhat when needed:
-   ```bash
-   npm --workspace contracts run compile
-   npm --workspace contracts run test
-   ```
+5. 打开浏览器访问 `http://localhost:3000`，无需登录即可看到仪表盘示例。
 
-## Environment variables
-- Global variables live in the root `.env` (see `.env.example`).
-- The API expects Supabase service keys and the Magic secret key.
-- The web app needs anon Supabase keys + the Magic publishable key.
-- Hardhat needs `POLYGON_AMOY_RPC_URL`, `WEB3_PRIVATE_KEY`, and an optional `POINTS_CONTRACT_ADDRESS` (also read by the API when set).
+## 环境变量
+- `.env`（给 API）：`PORT=4000`
+- `apps/web/.env.local`：`NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api`
 
-## Documentation
-- `docs/architecture.md` captures the reasoning behind the updated data model and component split.
-- `supabase/schema.sql` is the canonical schema; run it once per Supabase project.
+## 可选：恢复到真实后端
+当你准备接入 Supabase / Magic.link / Polygon 时：
+1. 运行 `npm --workspace contracts install` 并使用 Hardhat 部署 ERC-1155；
+2. 将 `supabase/schema.sql` 应用到数据库，然后重新实现 API；
+3. 按照 `docs/architecture.md` 重新加入鉴权、数据校验与链上同步逻辑。
 
-## Testing & linting
-- `npm --workspace apps/api run test` (placeholder) for backend logic.
-- `npm --workspace contracts run test` executes Hardhat test suites.
-- `npm --workspace apps/web run lint` runs Next.js lint.
-
-## Next steps
-- Wire the API to Supabase edge functions if you need serverless scaling.
-- Replace the simple in-process sync worker with a queue worker (Supabase Functions or Temporal) once throughput increases.
-- Extend the dashboard with analytics charts fed by Supabase real-time channels.
+## 后续建议
+- 将 `apps/api/db.json` 替换为数据库或 Supabase 表；
+- 加入 Playwright / Vitest 等自动化测试；
+- 依据实际需求扩展为生产级多租户推荐系统。
