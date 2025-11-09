@@ -1,53 +1,62 @@
-# RefChain MVP
+# RefChain MVP (Web2 Preview)
 
-RefChain now ships with a **minimal JSON驱动 demo**，方便你在本地快速体验前后端联动，无需搭建 Supabase、Magic.link 或 Polygon 节点。完整的 Web3 版架构依旧保存在 `docs/architecture.md`，随时可以在此基础上扩展。
+一个可登录的推荐与积分演示系统：
 
-## 架构速览（Mini 版本）
-- **Web**：Next.js 14 + Tailwind CSS，直接请求本地 API。
-- **API**：Express 4，所有数据均从 `apps/api/db.json` 读取。
-- **Data**：单个 JSON 文件即“数据库”，改完即可立即看到 UI 变化。
-- **Contracts**：Hardhat/ERC-1155 脚手架依然保留，等需要链上功能时再启用。
+- **后端**：Node.js + Express，内置会话、商户、推荐码、订单与积分逻辑（数据存于内存，结构与 `supabase/schema.sql` 一致，随时可接入真正的 PostgreSQL / Supabase）。
+- **前端**：Next.js 14 + Tailwind CSS，包含登录、仪表盘、推荐码生成、订单模拟。
+- **DDL**：`supabase/schema.sql`（PostgreSQL 版）与 `mvp_schema.sql`（MySQL 版）分别提供了完整的数据库结构。
 
-## 仓库结构
-```
-.
-├── apps
-│   ├── api        # 轻量 Express API（读取 db.json）
-│   └── web        # Next.js 仪表盘
-├── contracts      # Hardhat + ERC-1155（可选）
-├── docs           # 完整架构说明
-├── supabase       # 原始 SQL schema
-├── package.json   # npm workspaces
-└── README.md
-```
+## 快速启动
 
-## 快速运行（JSON Demo）
-1. 复制 `.env.example` → `.env`（只需要 `PORT` 与 `NEXT_PUBLIC_API_BASE_URL`）。
-2. 安装依赖：
+1. 初始化环境变量  
+   ```bash
+   cp .env.example .env
+   # 如需修改 API 地址/数据库连接，在各自文件内调整
+   ```
+   `.env` 默认已经填入提供的 MySQL 连接（host `35.236.223.1` / user `root` / password `Refchain@123` / db `refchain`），前端 `.env.local` 默认走 `http://localhost:4000/api`。
+
+2. 安装依赖  
    ```bash
    npm install
    npm --workspace apps/api install
    npm --workspace apps/web install
    ```
-3. 根据需要编辑 `apps/api/db.json`（示例数据已内置）。
-4. 分别启动后端与前端：
+
+3. 启动服务  
    ```bash
-   npm run dev:api    # http://localhost:4000
-   npm run dev:web    # http://localhost:3000
+   npm run dev:api   # http://localhost:4000
+   npm run dev:web   # http://localhost:3000
    ```
-5. 打开浏览器访问 `http://localhost:3000`，无需登录即可看到仪表盘示例。
 
-## 环境变量
-- `.env`（给 API）：`PORT=4000`
-- `apps/web/.env.local`：`NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api`
+4. 使用演示账号登录前端  
+   - 邮箱：`merchant@test.com`  
+   - 密码：`123456`
 
-## 可选：恢复到真实后端
-当你准备接入 Supabase / Magic.link / Polygon 时：
-1. 运行 `npm --workspace contracts install` 并使用 Hardhat 部署 ERC-1155；
-2. 将 `supabase/schema.sql` 应用到数据库，然后重新实现 API；
-3. 按照 `docs/architecture.md` 重新加入鉴权、数据校验与链上同步逻辑。
+登录后即可：
+- 查看仪表盘的关键指标（订单数、待处理数、推荐使用次数、积分余额）
+- 一键生成新的推荐链接
+- 模拟创建带推荐码的订单，实时更新订单列表和积分
 
-## 后续建议
-- 将 `apps/api/db.json` 替换为数据库或 Supabase 表；
-- 加入 Playwright / Vitest 等自动化测试；
-- 依据实际需求扩展为生产级多租户推荐系统。
+## 后端接口概览（`apps/api/src/routes`）
+
+| Endpoint | Method | 说明 |
+| --- | --- | --- |
+| `/api/auth/login` | POST | 邮箱 + 明文密码登录，返回 token + 可访问商户 |
+| `/api/merchants` | GET | 当前用户可管理的商户列表 |
+| `/api/dashboard?merchantId=` | GET | 统计视图（订单、推荐、积分） |
+| `/api/referrals` | GET/POST | 查询或生成推荐链接 |
+| `/api/orders` | GET/POST | 查询或模拟创建订单 |
+
+所有受保护的接口只需通过 `Authorization: Bearer <token>` 访问，不额外校验刷新令牌或多因素登录（符合题目“只需账号密码验证”的要求）。
+
+## 数据库脚本
+
+- `supabase/schema.sql`：最新的 PostgreSQL DDL，覆盖用户、会话、商户、团队成员、推荐、订单、积分流水与审核日志等实体。
+- `mysql/mock_data.sql`：基于现有 DDL 的 MySQL 测试数据脚本（清空相关表后插入演示账号/商户/推荐/订单/积分），运行 `mysql -h 35.236.223.1 -P 3306 -u root -p refchain < mysql/mock_data.sql` 即可。
+- `mvp_schema.sql`：来自《MVP版DDL.txt》的轻量 MySQL 版本，可作为学习参考。
+
+## 进一步扩展
+
+1. 把 `apps/api/src/data/store.ts` 替换为真实数据库查询（Supabase client、Prisma 等）。
+2. 在 `contracts/` 目录启用 Hardhat，将积分 `mint`/`burn` 同步到 Polygon (ERC-1155)。
+3. 引入密码哈希、刷新令牌、RBAC、Webhook 等生产级能力。

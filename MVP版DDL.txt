@@ -1,0 +1,367 @@
+﻿# 🪩 RefChain MVP (Web2 → Web3 Loyalty System)
+
+
+## 📖 项目逻辑说明
+
+
+RefChain 是一个推荐奖励系统，旨在帮助电商商户通过“分享链接 → 点击 → 积分奖励”的方式实现用户增长和复购激励。
+
+
+当前版本是 **Web2 MVP 测试版**，主要展示完整的推荐与积分发放闭环。  
+未来版本将引入区块链积分系统（ERC-1155 结构）以实现可验证、可交易的链上积分。
+
+
+---
+
+
+## 🔁 核心流程逻辑
+
+
+### 商户端逻辑
+
+
+1. 商户访问网站并通过账号密码登录（仅测试商户）
+2. 登录后可生成独立的推荐链接，例如：
+http://localhost:3000/ref/abc123xy
+
+
+sql
+Copy code
+3. 商户可在后台查看：
+- 每个推荐码被点击的次数  
+- 每个用户领取的积分数量  
+- 积分发放时间与历史记录  
+
+
+---
+
+
+### 用户端逻辑
+
+
+1. 用户通过推荐链接访问网站  
+2. 页面展示“输入邮箱领取积分”表单  
+3. 用户填写邮箱后点击领取按钮  
+4. 后端验证推荐码 → 生成或查询用户 → 发放积分 → 记录交易日志  
+5. 返回发放结果（当前为虚拟 Web3 模拟，积分存储在 MySQL）
+
+
+---
+
+
+### 后端逻辑
+
+
+1. 商户登录：验证邮箱 + 密码  
+2. 生成推荐链接：为当前商户创建随机 `referral code`  
+3. 点击推荐链接：触发积分发放流程
+- 更新 `referrals.clicks`
+- 插入或更新用户积分余额 (`points`)
+- 写入交易记录 (`point_transactions`)
+4. 商户查看积分记录：读取该商户的所有积分交易明细  
+
+
+---
+
+
+### Web3 模拟逻辑
+
+
+当前系统未直接上链，但已按照 ERC-1155 架构设计积分体系。  
+MySQL 表结构完全对应合约函数，未来可平滑迁移至 Polygon 测试网。
+
+
+| 数据库操作 | 对应智能合约函数 |
+|-------------|--------------------|
+| `INSERT INTO points` | `mint(address to, uint256 id, uint256 amount)` |
+| `SELECT balance FROM points` | `balanceOf(address account, uint256 id)` |
+| `INSERT INTO point_transactions` | `emit TransferSingle(...)` |
+
+
+---
+
+
+## ⚙️ 技术栈
+
+
+| 层级 | 技术 |
+|------|------|
+| 前端 | Next.js + Tailwind CSS + Axios |
+| 后端 | Node.js + Express |
+| 数据库 | MySQL |
+| Web3（预留） | Solidity + Hardhat + OpenZeppelin ERC-1155 |
+
+
+---
+
+
+## 🗄️ 数据库结构 (`backend/schema.sql`)
+
+
+```sql
+CREATE DATABASE IF NOT EXISTS refchain_mvp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE refchain_mvp;
+
+
+-- 商户表（登录使用）
+CREATE TABLE merchants (
+id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+name VARCHAR(100) NOT NULL,
+email VARCHAR(255) NOT NULL UNIQUE,
+password_hash VARCHAR(255) NOT NULL,
+points_reward_per_click INT DEFAULT 50,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- 推荐链接表
+CREATE TABLE referrals (
+id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+code VARCHAR(50) NOT NULL UNIQUE,
+merchant_id CHAR(36) NOT NULL,
+clicks INT DEFAULT 0,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE
+);
+
+
+-- 用户表（点击推荐链接的访客）
+CREATE TABLE users (
+id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+email VARCHAR(255) NOT NULL UNIQUE,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- 用户积分表（模拟链上余额）
+CREATE TABLE points (
+id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+user_id CHAR(36) NOT NULL,
+merchant_id CHAR(36) NOT NULL,
+balance INT DEFAULT 0,
+updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+CONSTRAINT unique_user_merchant UNIQUE (user_id, merchant_id),
+FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE
+);
+
+
+-- 积分交易表
+CREATE TABLE point_transactions (
+id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+user_id CHAR(36) NOT NULL,
+referral_id CHAR(36) NOT NULL,
+merchant_id CHAR(36) NOT NULL,
+points_change INT NOT NULL,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+FOREIGN KEY (referral_id) REFERENCES referrals(id) ON DELETE CASCADE,
+FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE
+);
+
+
+-- 测试商户初始化（密码 123456）
+INSERT INTO merchants (name, email, password_hash, points_reward_per_click)
+VALUES (
+'Test Store',
+'merchant@test.com',
+'$2b$10$7dS03fK5aZ5y7tv/82PO7OL53UUS7PtklnKj2uP1T5A8SdOzzMOfy',
+50
+);
+💻 后端接口说明
+Endpoint        Method        功能        是否需要登录
+/api/auth/login        POST        商户账号密码登录        ✅
+/api/referrals/create        POST        生成新的推荐链接        ✅
+/api/referrals/click/:code        POST        用户点击推荐链接领取积分        🚫
+/api/merchant/:merchantId/transactions        GET        查看商户积分记录        ✅
+
+
+🔄 用户点击推荐链接发放积分逻辑
+该部分是当前 MVP 的核心功能。
+用户访问推荐链接后，后端根据推荐码执行以下操作：
+
+
+查找推荐码对应商户
+
+
+创建或查找用户（根据邮箱）
+
+
+更新推荐码点击次数
+
+
+发放积分（更新 points 表）
+
+
+写入交易日志（记录发放详情）
+
+
+示例逻辑片段：
+
+
+javascript
+Copy code
+// POST /api/referrals/click/:code
+router.post('/click/:code', (req, res) => {
+  const { code } = req.params;
+  const { email } = req.body;
+
+
+  db.query(`SELECT * FROM referrals WHERE code = ?`, [code], (err, refs) => {
+    if (refs.length === 0) return res.status(404).json({ error: "推荐码无效" });
+
+
+    const referral = refs[0];
+    const merchantId = referral.merchant_id;
+
+
+    db.query(`UPDATE referrals SET clicks = clicks + 1 WHERE id = ?`, [referral.id]);
+
+
+    db.query(`SELECT * FROM users WHERE email = ?`, [email], (err2, users) => {
+      if (users.length === 0) db.query(`INSERT INTO users (email) VALUES (?)`, [email]);
+
+
+      db.query(`SELECT id FROM users WHERE email = ?`, [email], (err3, ures) => {
+        const userId = ures[0].id;
+
+
+        db.query(`SELECT points_reward_per_click FROM merchants WHERE id = ?`, [merchantId], (err4, res4) => {
+          const reward = res4[0].points_reward_per_click;
+
+
+          db.query(`INSERT INTO points (user_id, merchant_id, balance)
+                    VALUES (?, ?, ?) 
+                    ON DUPLICATE KEY UPDATE balance = balance + VALUES(balance)`,
+                    [userId, merchantId, reward]);
+
+
+          db.query(`INSERT INTO point_transactions (user_id, referral_id, merchant_id, points_change)
+                    VALUES (?, ?, ?, ?)`, [userId, referral.id, merchantId, reward]);
+
+
+          res.json({ message: "积分发放成功 (Web2 模拟)", reward });
+        });
+      });
+    });
+  });
+});
+🪙 Web3 扩展准备
+未来版本中，这一积分发放逻辑将被替换为对智能合约的 mint() 调用。
+
+
+当前合约已在 contracts/RefChainPoints.sol 文件中保留结构：
+
+
+solidity
+Copy code
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
+
+contract RefChainPoints is ERC1155, AccessControl {
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
+
+    constructor() ERC1155("https://api.refchain.xyz/meta/{id}.json") {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, msg.sender);
+    }
+
+
+    function mint(address to, uint256 id, uint256 amount)
+        external
+        onlyRole(MINTER_ROLE)
+    {
+        _mint(to, id, amount, "");
+    }
+
+
+    function getUserBalance(address user, uint256 id)
+        external
+        view
+        returns (uint256)
+    {
+        return balanceOf(user, id);
+    }
+}
+未来可通过以下逻辑在后端接入链上调用：
+
+
+javascript
+Copy code
+const { ethers } = require('ethers');
+const abi = require('../../contracts/RefChainPoints.json');
+
+
+const provider = new ethers.JsonRpcProvider(process.env.POLYGON_AMOY_RPC);
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+const contract = new ethers.Contract(process.env.CONTRACT_ADDRESS, abi, wallet);
+
+
+await contract.mint(userWalletAddress, merchantTokenId, reward);
+💻 前端页面结构
+页面        功能
+/login        商户登录
+/dashboard        生成推荐链接 + 查看积分记录
+/ref/[code]        用户输入邮箱领取积分
+
+
+所有页面均使用 Tailwind CSS 和 Axios 调用后端接口。
+商户 ID 存储于 localStorage，无需复杂身份验证。
+
+
+🧩 启动指令
+启动后端
+bash
+Copy code
+cd backend
+npm install express mysql2 bcryptjs nanoid cors
+mysql -u root -p < schema.sql
+node server.js
+启动前端
+bash
+Copy code
+cd frontend
+npm install next react react-dom axios tailwindcss
+npm run dev
+访问地址：
+
+
+商户登录: http://localhost:3000/login
+
+
+商户后台: http://localhost:3000/dashboard
+
+
+推荐链接: http://localhost:3000/ref/[code]
+
+
+📁 项目说明
+文件夹        说明
+backend/        Node.js + MySQL 后端服务
+frontend/        Next.js 商户与用户前端
+contracts/        Web3 扩展合约模板 (未接入)
+schema.sql        数据库定义文件
+README.md        项目文档
+
+
+🔗 环境变量示例 (.env.example)
+bash
+Copy code
+# Backend
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=refchain_mvp
+PORT=5000
+
+
+# Web3 (future)
+POLYGON_AMOY_RPC=https://rpc-amoy.polygon.technology
+PRIVATE_KEY=your_wallet_private_key
+CONTRACT_ADDRESS=0xYourDeployedContract
+yaml
+Copy code

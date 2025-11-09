@@ -1,57 +1,89 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import LoginForm from '@/components/LoginForm';
 import DashboardView from '@/components/DashboardView';
-import type { MerchantDashboard } from '@/types';
+import type { LoginResponse, Merchant } from '@/types';
+import { apiFetch } from '@/lib/api';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api';
+type Session = {
+  token: string;
+  profileName: string;
+  merchants: Merchant[];
+  merchantId: string;
+};
+
+const storageKey = 'refchain-session';
 
 export default function HomePage() {
-  const [data, setData] = useState<MerchantDashboard | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function fetchDashboard() {
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored) {
       try {
-        const response = await fetch(`${API_BASE_URL}/dashboard`);
-        if (!response.ok) {
-          throw new Error(`请求失败：${response.status}`);
-        }
-        const payload = (await response.json()) as MerchantDashboard;
-        if (isMounted) {
-          setData(payload);
-          setError(null);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError((err as Error).message);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        setSession(JSON.parse(stored));
+      } catch {
+        window.localStorage.removeItem(storageKey);
       }
     }
-
-    fetchDashboard();
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  useEffect(() => {
+    if (session) {
+      window.localStorage.setItem(storageKey, JSON.stringify(session));
+    } else {
+      window.localStorage.removeItem(storageKey);
+    }
+  }, [session]);
+
+  const selectedMerchant = useMemo(() => {
+    if (!session) return null;
+    return session.merchants.find((merchant) => merchant.id === session.merchantId) ?? session.merchants[0];
+  }, [session]);
+
+  const handleLogin = async ({ email, password }: { email: string; password: string }) => {
+    setLoginError(null);
+    setLoginLoading(true);
+    try {
+      const response = await apiFetch<LoginResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+      if (!response.merchants.length) {
+        throw new Error('该账号尚未绑定商户');
+      }
+      setSession({
+        token: response.token,
+        profileName: response.profile.displayName,
+        merchants: response.merchants,
+        merchantId: response.merchants[0].id
+      });
+    } catch (error) {
+      setLoginError((error as Error).message);
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setSession(null);
+  };
 
   return (
     <main className="min-h-screen px-4 pb-12">
-      {loading && <p className="mt-20 text-center text-slate-300">加载示例数据中…</p>}
-      {error && (
-        <div className="glass mx-auto mt-12 max-w-xl p-8 text-center text-red-200">
-          <p>无法获取数据：{error}</p>
-          <p className="mt-2 text-sm text-slate-400">请确认 API (npm run dev:api) 已在本地运行。</p>
-        </div>
+      {session && selectedMerchant ? (
+        <DashboardView
+          token={session.token}
+          merchant={selectedMerchant}
+          profileName={session.profileName}
+          onLogout={handleLogout}
+        />
+      ) : (
+        <LoginForm onSubmit={handleLogin} loading={loginLoading} error={loginError ?? undefined} />
       )}
-      {!loading && !error && data && <DashboardView data={data} />}
     </main>
   );
 }

@@ -1,34 +1,20 @@
--- RefChain MVP – Relational schema with login + loyalty modules
+-- RefChain MVP – MySQL 8.0 版 ------------------------------------------------
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Keep updated_at fresh on every write
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- 1. Authentication & identity ------------------------------------------------
-
-CREATE TYPE login_provider AS ENUM ('password', 'magic_link', 'wallet');
-CREATE TYPE user_status AS ENUM ('pending', 'active', 'suspended', 'deleted');
+-- 1. Authentication & identity ---------------------------------------------
 
 CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email TEXT NOT NULL UNIQUE,
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  email VARCHAR(320) NOT NULL UNIQUE,
   password_hash TEXT,
   password_salt TEXT,
-  login_provider login_provider NOT NULL DEFAULT 'password',
+  login_provider ENUM('password', 'magic_link', 'wallet') NOT NULL DEFAULT 'password',
   is_email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-  status user_status NOT NULL DEFAULT 'pending',
-  last_login_at TIMESTAMPTZ,
-  failed_attempts INTEGER NOT NULL DEFAULT 0,
-  locked_until TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  status ENUM('pending', 'active', 'suspended', 'deleted') NOT NULL DEFAULT 'pending',
+  last_login_at TIMESTAMP NULL,
+  failed_attempts INT NOT NULL DEFAULT 0,
+  locked_until TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CHECK (
     (login_provider = 'password' AND password_hash IS NOT NULL)
     OR login_provider <> 'password'
@@ -36,212 +22,224 @@ CREATE TABLE users (
 );
 
 CREATE TABLE sessions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  refresh_token TEXT NOT NULL UNIQUE,
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  user_id CHAR(36) NOT NULL,
+  refresh_token VARCHAR(255) NOT NULL UNIQUE,
   user_agent TEXT,
-  ip_address TEXT,
-  expires_at TIMESTAMPTZ NOT NULL,
-  revoked_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  ip_address VARCHAR(45),
+  expires_at TIMESTAMP NOT NULL,
+  revoked_at TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
 CREATE INDEX sessions_user_idx ON sessions(user_id);
-CREATE INDEX sessions_active_idx ON sessions(user_id, expires_at) WHERE revoked_at IS NULL;
+CREATE INDEX sessions_active_idx ON sessions(user_id, expires_at, revoked_at);
 
 CREATE TABLE password_reset_tokens (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash TEXT NOT NULL UNIQUE,
-  expires_at TIMESTAMPTZ NOT NULL,
-  consumed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  user_id CHAR(36) NOT NULL,
+  token_hash VARCHAR(255) NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  consumed_at TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE profiles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-  display_name TEXT,
-  avatar_url TEXT,
-  wallet_address TEXT UNIQUE,
-  locale TEXT DEFAULT 'en-US',
-  timezone TEXT DEFAULT 'UTC',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  user_id CHAR(36) NOT NULL UNIQUE,
+  display_name VARCHAR(255),
+  avatar_url VARCHAR(2048),
+  wallet_address VARCHAR(255) UNIQUE,
+  locale VARCHAR(10) DEFAULT 'en-US',
+  timezone VARCHAR(64) DEFAULT 'UTC',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_profiles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
 CREATE INDEX profiles_user_idx ON profiles(user_id);
 
--- 2. Merchant & team management ----------------------------------------------
-
-CREATE TYPE merchant_status AS ENUM ('draft', 'active', 'suspended');
-CREATE TYPE member_role AS ENUM ('owner', 'admin', 'staff', 'analyst');
+-- 2. Merchant & team management -------------------------------------------
 
 CREATE TABLE merchants (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  owner_profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
-  name TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
-  industry TEXT,
-  support_email TEXT,
-  support_phone TEXT,
-  wallet_address TEXT,
-  cashback_percentage NUMERIC(5,2) NOT NULL DEFAULT 5.0 CHECK (cashback_percentage BETWEEN 0 AND 100),
-  referral_reward_percentage NUMERIC(5,2) NOT NULL DEFAULT 2.0 CHECK (referral_reward_percentage BETWEEN 0 AND 100),
-  logo_url TEXT,
-  status merchant_status NOT NULL DEFAULT 'draft',
-  metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  owner_profile_id CHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) NOT NULL UNIQUE,
+  industry VARCHAR(255),
+  support_email VARCHAR(320),
+  support_phone VARCHAR(32),
+  wallet_address VARCHAR(255),
+  cashback_percentage DECIMAL(5,2) NOT NULL DEFAULT 5.00 CHECK (cashback_percentage BETWEEN 0 AND 100),
+  referral_reward_percentage DECIMAL(5,2) NOT NULL DEFAULT 2.00 CHECK (referral_reward_percentage BETWEEN 0 AND 100),
+  logo_url VARCHAR(2048),
+  status ENUM('draft', 'active', 'suspended') NOT NULL DEFAULT 'draft',
+  metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_merchants_owner FOREIGN KEY (owner_profile_id) REFERENCES profiles(id) ON DELETE RESTRICT
 );
+
 CREATE INDEX merchants_owner_idx ON merchants(owner_profile_id);
 
 CREATE TABLE merchant_members (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
-  profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  role member_role NOT NULL DEFAULT 'staff',
-  invited_by UUID REFERENCES profiles(id),
-  invited_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  accepted_at TIMESTAMPTZ,
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  merchant_id CHAR(36) NOT NULL,
+  profile_id CHAR(36) NOT NULL,
+  role ENUM('owner', 'admin', 'staff', 'analyst') NOT NULL DEFAULT 'staff',
+  invited_by CHAR(36),
+  invited_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  accepted_at TIMESTAMP NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  UNIQUE (merchant_id, profile_id)
+  UNIQUE (merchant_id, profile_id),
+  CONSTRAINT fk_merchant_members_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
+  CONSTRAINT fk_merchant_members_profile FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_merchant_members_invited_by FOREIGN KEY (invited_by) REFERENCES profiles(id)
 );
+
 CREATE INDEX merchant_members_role_idx ON merchant_members(merchant_id, role);
 
 CREATE TABLE api_keys (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
-  key_hash TEXT NOT NULL UNIQUE,
-  label TEXT NOT NULL,
-  last_used_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  revoked_at TIMESTAMPTZ
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  merchant_id CHAR(36) NOT NULL,
+  key_hash VARCHAR(255) NOT NULL UNIQUE,
+  label VARCHAR(255) NOT NULL,
+  last_used_at TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  revoked_at TIMESTAMP NULL,
+  CONSTRAINT fk_api_keys_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE
 );
 
--- 3. Referrals, orders & loyalty ---------------------------------------------
+-- 3. Referrals, orders & loyalty -------------------------------------------
 
 CREATE TABLE referral_links (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code TEXT NOT NULL UNIQUE,
-  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
-  owner_profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  max_uses INTEGER DEFAULT 0 CHECK (max_uses >= 0),
-  usage_count INTEGER NOT NULL DEFAULT 0 CHECK (usage_count >= 0),
-  expires_at TIMESTAMPTZ,
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  code VARCHAR(255) NOT NULL UNIQUE,
+  merchant_id CHAR(36) NOT NULL,
+  owner_profile_id CHAR(36) NOT NULL,
+  max_uses INT DEFAULT 0 CHECK (max_uses >= 0),
+  usage_count INT NOT NULL DEFAULT 0 CHECK (usage_count >= 0),
+  expires_at TIMESTAMP NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_referral_links_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
+  CONSTRAINT fk_referral_links_owner FOREIGN KEY (owner_profile_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
+
 CREATE INDEX referral_links_merchant_idx ON referral_links(merchant_id);
 CREATE INDEX referral_links_owner_idx ON referral_links(owner_profile_id);
 
-CREATE TYPE order_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'cancelled');
-CREATE TYPE onchain_status AS ENUM ('not_started', 'pending', 'synced', 'failed');
-
 CREATE TABLE orders (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  order_code TEXT NOT NULL UNIQUE,
-  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
-  buyer_profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
-  referral_id UUID REFERENCES referral_links(id) ON DELETE SET NULL,
-  amount NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
-  currency TEXT NOT NULL DEFAULT 'USD',
-  cashback_points INTEGER NOT NULL DEFAULT 0 CHECK (cashback_points >= 0),
-  referral_points INTEGER NOT NULL DEFAULT 0 CHECK (referral_points >= 0),
-  status order_status NOT NULL DEFAULT 'pending',
-  onchain_status onchain_status NOT NULL DEFAULT 'not_started',
-  transaction_hash TEXT,
-  metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  order_code VARCHAR(255) NOT NULL UNIQUE,
+  merchant_id CHAR(36) NOT NULL,
+  buyer_profile_id CHAR(36) NULL,
+  buyer_email VARCHAR(255) NOT NULL,
+  referral_id CHAR(36) NULL,
+  amount DECIMAL(12,2) NOT NULL CHECK (amount >= 0),
+  currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+  cashback_points INT NOT NULL DEFAULT 0 CHECK (cashback_points >= 0),
+  referral_points INT NOT NULL DEFAULT 0 CHECK (referral_points >= 0),
+  status ENUM('pending', 'processing', 'completed', 'failed', 'cancelled') NOT NULL DEFAULT 'pending',
+  onchain_status ENUM('not_started', 'pending', 'synced', 'failed') NOT NULL DEFAULT 'not_started',
+  transaction_hash VARCHAR(255),
+  metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_orders_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
+  CONSTRAINT fk_orders_buyer FOREIGN KEY (buyer_profile_id) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT fk_orders_referral FOREIGN KEY (referral_id) REFERENCES referral_links(id) ON DELETE SET NULL
 );
+
 CREATE INDEX orders_merchant_idx ON orders(merchant_id);
 CREATE INDEX orders_buyer_idx ON orders(buyer_profile_id);
 CREATE INDEX orders_status_idx ON orders(status);
 
 CREATE TABLE point_ledger (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
-  profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
-  points INTEGER NOT NULL CHECK (points > 0),
-  direction TEXT NOT NULL CHECK (direction IN ('credit', 'debit')),
-  source TEXT NOT NULL,
-  metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  merchant_id CHAR(36) NOT NULL,
+  profile_id CHAR(36) NOT NULL,
+  order_id CHAR(36) NULL,
+  points INT NOT NULL CHECK (points > 0),
+  direction ENUM('credit', 'debit') NOT NULL,
+  source VARCHAR(255) NOT NULL,
+  metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_point_ledger_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
+  CONSTRAINT fk_point_ledger_profile FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_point_ledger_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
 );
+
 CREATE INDEX point_ledger_profile_idx ON point_ledger(profile_id);
 CREATE INDEX point_ledger_merchant_idx ON point_ledger(merchant_id);
 
 CREATE TABLE wallet_balances (
-  merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
-  profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  balance INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (merchant_id, profile_id)
+  merchant_id CHAR(36) NOT NULL,
+  profile_id CHAR(36) NOT NULL,
+  balance INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (merchant_id, profile_id),
+  CONSTRAINT fk_wallet_balances_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
+  CONSTRAINT fk_wallet_balances_profile FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
 
 CREATE TABLE sync_tasks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
-  task_type TEXT NOT NULL CHECK (task_type IN ('mint_points', 'revoke_points')),
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
-  payload JSONB NOT NULL,
-  attempts INTEGER NOT NULL DEFAULT 0,
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  order_id CHAR(36) NULL,
+  task_type ENUM('mint_points', 'revoke_points') NOT NULL,
+  status ENUM('pending', 'processing', 'completed', 'failed') NOT NULL DEFAULT 'pending',
+  payload JSON NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
   last_error TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_sync_tasks_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
+
 CREATE INDEX sync_tasks_status_idx ON sync_tasks(status);
 
--- 4. Audit & supporting utilities --------------------------------------------
+-- 4. Audit & supporting utilities ------------------------------------------
 
 CREATE TABLE audit_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  actor_profile_id UUID REFERENCES profiles(id),
-  merchant_id UUID REFERENCES merchants(id),
-  event TEXT NOT NULL,
+  id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  actor_profile_id CHAR(36) NULL,
+  merchant_id CHAR(36) NULL,
+  event VARCHAR(255) NOT NULL,
   description TEXT,
-  metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_audit_logs_actor FOREIGN KEY (actor_profile_id) REFERENCES profiles(id),
+  CONSTRAINT fk_audit_logs_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id)
 );
 
-CREATE OR REPLACE FUNCTION increment_referral_usage(referral_uuid UUID)
-RETURNS VOID AS $$
+-- 存储过程：对应 PostgreSQL 里的 increment_referral_usage()
+DELIMITER $$
+
+CREATE PROCEDURE increment_referral_usage(IN p_referral_uuid CHAR(36))
 BEGIN
   UPDATE referral_links
   SET usage_count = usage_count + 1,
-      updated_at = NOW()
-  WHERE id = referral_uuid;
-END;
-$$ LANGUAGE plpgsql;
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = p_referral_uuid;
+END$$
 
-CREATE OR REPLACE FUNCTION recompute_wallet_balances()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO wallet_balances (merchant_id, profile_id, balance)
-  VALUES (NEW.merchant_id, NEW.profile_id, CASE WHEN NEW.direction = 'credit' THEN NEW.points ELSE -NEW.points END)
-  ON CONFLICT (merchant_id, profile_id)
-  DO UPDATE
-    SET balance = wallet_balances.balance + (
-      CASE WHEN NEW.direction = 'credit' THEN NEW.points ELSE -NEW.points END
-    );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_users_updated BEFORE UPDATE ON users
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_profiles_updated BEFORE UPDATE ON profiles
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_merchants_updated BEFORE UPDATE ON merchants
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_referrals_updated BEFORE UPDATE ON referral_links
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_orders_updated BEFORE UPDATE ON orders
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_sync_tasks_updated BEFORE UPDATE ON sync_tasks
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
+-- 触发器：对应 recompute_wallet_balances() + trg_point_ledger_balance
 CREATE TRIGGER trg_point_ledger_balance
 AFTER INSERT ON point_ledger
-FOR EACH ROW EXECUTE FUNCTION recompute_wallet_balances();
+FOR EACH ROW
+BEGIN
+  INSERT INTO wallet_balances (merchant_id, profile_id, balance)
+  VALUES (
+    NEW.merchant_id,
+    NEW.profile_id,
+    CASE WHEN NEW.direction = 'credit' THEN NEW.points ELSE -NEW.points END
+  )
+  ON DUPLICATE KEY UPDATE
+    balance = wallet_balances.balance +
+      (CASE WHEN NEW.direction = 'credit' THEN NEW.points ELSE -NEW.points END);
+END$$
+
+DELIMITER ;
