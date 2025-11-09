@@ -59,3 +59,12 @@ export interface LoginResponse {
   };
   merchants: Merchant[];
 }
+
+export interface PointsSyncStatus {
+  merchantId: string;
+  walletAddress: string | null;
+  tokenId: number | null;
+  localPoints: number;
+  onchainBalance: number | null;
+  status: 'synced' | 'pending' | 'not_configured';
+}

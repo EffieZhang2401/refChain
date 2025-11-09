@@ -72,6 +72,7 @@ CREATE TABLE merchants (
   support_email VARCHAR(320),
   support_phone VARCHAR(32),
   wallet_address VARCHAR(255),
+  token_id INT UNIQUE,
   cashback_percentage DECIMAL(5,2) NOT NULL DEFAULT 5.00 CHECK (cashback_percentage BETWEEN 0 AND 100),
   referral_reward_percentage DECIMAL(5,2) NOT NULL DEFAULT 2.00 CHECK (referral_reward_percentage BETWEEN 0 AND 100),
   logo_url VARCHAR(2048),

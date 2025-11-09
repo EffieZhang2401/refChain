@@ -31,6 +31,9 @@
 4. 使用演示账号登录前端  
    - 邮箱：`merchant@test.com`  
    - 密码：`123456`
+5. （可选）准备 Polygon Amoy 连接  
+   - 设置 `.env` 中的 `POLYGON_AMOY_RPC_URL / WEB3_PRIVATE_KEY / POINTS_CONTRACT_ADDRESS`
+   - MetaMask 切换到 Amoy，与前端的 Connect Wallet 功能配合即可把钱包地址写入数据库，并触发积分上链。
 
 登录后即可：
 - 查看仪表盘的关键指标（订单数、待处理数、推荐使用次数、积分余额）
@@ -49,10 +52,15 @@
 
 所有受保护的接口只需通过 `Authorization: Bearer <token>` 访问，不额外校验刷新令牌或多因素登录（符合题目“只需账号密码验证”的要求）。
 
+## 新增 Web3 功能
+- Dashboard 顶部可 “Connect Wallet”，成功后会把地址回写 `merchants.wallet_address`（并可选更新 `token_id`）。
+- 模拟订单时，如果配置了 Polygon RPC + 合约 + 商户 tokenId，则会直接调用 ERC-1155 合约 `mint` 并记录 `transaction_hash`、`onchain_status`。
+- 新增接口 `GET /api/points/onchain/:merchantId`，返回本地积分与链上积分的对比，前端会显示同步状态。
+
 ## 数据库脚本
 
 - `supabase/schema.sql`：最新的 PostgreSQL DDL，覆盖用户、会话、商户、团队成员、推荐、订单、积分流水与审核日志等实体。
-- `mysql/mock_data.sql`：基于现有 DDL 的 MySQL 测试数据脚本（清空相关表后插入演示账号/商户/推荐/订单/积分），运行 `mysql -h 35.236.223.1 -P 3306 -u root -p refchain < mysql/mock_data.sql` 即可。
+- `mysql/mock_data.sql`：基于现有 DDL 的 MySQL 测试数据脚本（清空相关表后插入演示账号/商户/推荐/订单/积分，并为商户设置 `token_id=1`），运行 `mysql -h 35.236.223.1 -P 3306 -u root -p refchain < mysql/mock_data.sql` 即可。
 - `mvp_schema.sql`：来自《MVP版DDL.txt》的轻量 MySQL 版本，可作为学习参考。
 
 ## 进一步扩展

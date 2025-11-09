@@ -4,9 +4,14 @@ import pool from '../db/pool';
 import { requireAuth } from '../middleware/requireAuth';
 import { buildInClause } from '../utils/sql';
 import type { Merchant } from '../types';
+import { z } from 'zod';
 
 export const merchantsRouter = Router();
 
+const walletSchema = z.object({
+  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, '钱包地址格式不正确'),
+  tokenId: z.number().int().positive().optional()
+});
 merchantsRouter.get('/', requireAuth, async (req, res, next) => {
   try {
     const merchantIds = req.auth!.merchantIds;
@@ -35,6 +40,27 @@ merchantsRouter.get('/', requireAuth, async (req, res, next) => {
       params
     );
     res.json(merchants);
+  } catch (error) {
+    next(error);
+  }
+});
+
+merchantsRouter.put('/:merchantId/wallet', requireAuth, async (req, res, next) => {
+  try {
+    const { merchantId } = req.params;
+    if (!req.auth!.merchantIds.includes(merchantId)) {
+      return res.status(403).json({ message: '无权更新该商户钱包' });
+    }
+    const body = walletSchema.parse(req.body);
+    await pool.query(
+      `
+        UPDATE merchants
+        SET wallet_address = ?, token_id = COALESCE(?, token_id), updated_at = NOW()
+        WHERE id = ?
+      `,
+      [body.walletAddress.toLowerCase(), body.tokenId ?? null, merchantId]
+    );
+    res.json({ walletAddress: body.walletAddress.toLowerCase(), tokenId: body.tokenId ?? null });
   } catch (error) {
     next(error);
   }

@@ -4,6 +4,7 @@ import { merchantsRouter } from './merchants';
 import { referralsRouter } from './referrals';
 import { ordersRouter } from './orders';
 import { dashboardRouter } from './dashboard';
+import { pointsRouter } from './points';
 
 export const apiRouter = Router();
 
@@ -12,3 +13,4 @@ apiRouter.use('/merchants', merchantsRouter);
 apiRouter.use('/referrals', referralsRouter);
 apiRouter.use('/orders', ordersRouter);
 apiRouter.use('/dashboard', dashboardRouter);
+apiRouter.use('/points', pointsRouter);

@@ -78,6 +78,7 @@ export interface Order {
   referralPoints: number;
   status: OrderStatus;
   onchainStatus: OnChainStatus;
+  transactionHash?: string | null;
   createdAt: string;
 }
 

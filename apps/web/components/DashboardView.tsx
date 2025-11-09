@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Merchant, MerchantDashboard, Order, ReferralLink } from '@/types';
+import type { Merchant, MerchantDashboard, Order, PointsSyncStatus, ReferralLink } from '@/types';
 import { apiFetch } from '@/lib/api';
 
 interface DashboardViewProps {
@@ -19,30 +19,46 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
   const [dashboard, setDashboard] = useState<MerchantDashboard | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [referrals, setReferrals] = useState<ReferralLink[]>([]);
+  const [pointsStatus, setPointsStatus] = useState<PointsSyncStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creatingReferral, setCreatingReferral] = useState(false);
   const [orderForm, setOrderForm] = useState({ amount: '199', buyerEmail: 'user@example.com', referralCode: '' });
   const [creatingOrder, setCreatingOrder] = useState(false);
+  const [connectingWallet, setConnectingWallet] = useState(false);
+  const [chainId, setChainId] = useState<string | null>(null);
+
+  const fetchDashboardData = useCallback(async () => {
+    const [dashboardData, orderList, referralList] = await Promise.all([
+      apiFetch<MerchantDashboard>(`/dashboard?merchantId=${merchant.id}`, { token }),
+      apiFetch<Order[]>(`/orders?merchantId=${merchant.id}`, { token }),
+      apiFetch<ReferralLink[]>(`/referrals?merchantId=${merchant.id}`, { token })
+    ]);
+    setDashboard(dashboardData);
+    setOrders(orderList);
+    setReferrals(referralList);
+  }, [merchant.id, token]);
+
+  const fetchPointsStatus = useCallback(async () => {
+    const data = await apiFetch<PointsSyncStatus>(`/points/onchain/${merchant.id}`, { token });
+    setPointsStatus(data);
+  }, [merchant.id, token]);
 
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const [dashboardData, orderList, referralList] = await Promise.all([
-        apiFetch<MerchantDashboard>(`/dashboard?merchantId=${merchant.id}`, { token }),
-        apiFetch<Order[]>(`/orders?merchantId=${merchant.id}`, { token }),
-        apiFetch<ReferralLink[]>(`/referrals?merchantId=${merchant.id}`, { token })
-      ]);
-      setDashboard(dashboardData);
-      setOrders(orderList);
-      setReferrals(referralList);
+      await Promise.all([fetchDashboardData(), fetchPointsStatus()]);
     } catch (err) {
+      if ((err as any)?.status === 401) {
+        onLogout();
+        return;
+      }
       setError((err as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [merchant.id, token]);
+  }, [fetchDashboardData, fetchPointsStatus]);
 
   useEffect(() => {
     fetchAll();
@@ -58,6 +74,10 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
       });
       await fetchAll();
     } catch (err) {
+      if ((err as any)?.status === 401) {
+        onLogout();
+        return;
+      }
       setError((err as Error).message);
     } finally {
       setCreatingReferral(false);
@@ -87,6 +107,10 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
       setOrderForm({ amount: '199', buyerEmail: orderForm.buyerEmail, referralCode: '' });
       await fetchAll();
     } catch (err) {
+      if ((err as any)?.status === 401) {
+        onLogout();
+        return;
+      }
       setError((err as Error).message);
     } finally {
       setCreatingOrder(false);
@@ -94,6 +118,35 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
   };
 
   const topReferrals = useMemo(() => referrals.slice().sort((a, b) => b.usageCount - a.usageCount), [referrals]);
+
+  const handleConnectWallet = async () => {
+    if (typeof window === 'undefined' || !(window as any).ethereum) {
+      setError('请先安装 MetaMask 或其它兼容钱包扩展');
+      return;
+    }
+    try {
+      setConnectingWallet(true);
+      const ethereum = (window as any).ethereum;
+      const accounts: string[] = await ethereum.request({ method: 'eth_requestAccounts' });
+      const selected = accounts[0];
+      const networkChainId: string = await ethereum.request({ method: 'eth_chainId' });
+      setChainId(networkChainId);
+      await apiFetch(`/merchants/${merchant.id}/wallet`, {
+        method: 'PUT',
+        token,
+        body: JSON.stringify({ walletAddress: selected })
+      });
+      await fetchPointsStatus();
+    } catch (err) {
+      if ((err as any)?.status === 401) {
+        onLogout();
+        return;
+      }
+      setError((err as Error).message);
+    } finally {
+      setConnectingWallet(false);
+    }
+  };
 
   if (loading && !dashboard) {
     return <p className="mt-20 text-center text-slate-300">加载数据中…</p>;
@@ -103,10 +156,7 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
     return (
       <div className="glass mx-auto mt-12 max-w-xl p-8 text-center">
         <p className="text-lg text-red-300">加载失败：{error}</p>
-        <button
-          className="mt-4 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white"
-          onClick={fetchAll}
-        >
+        <button className="mt-4 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white" onClick={fetchAll}>
           重试
         </button>
       </div>
@@ -149,6 +199,14 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
         <MetricCard label="未结算积分" value={numberFormatter.format(dashboard.totals.totalPointsOutstanding)} />
       </div>
 
+      <WalletPanel
+        status={pointsStatus}
+        chainId={chainId}
+        onConnect={handleConnectWallet}
+        loading={connectingWallet}
+        onRefresh={fetchPointsStatus}
+      />
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="glass p-6 lg:col-span-2">
           <div className="flex items-center justify-between border-b border-white/10 pb-4">
@@ -162,11 +220,27 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
           ) : (
             <div className="divide-y divide-white/5">
               {orders.map((order) => (
-                <div key={order.id} className="flex items-center justify-between py-4 text-sm">
+                <div
+                  key={order.id}
+                  className="flex flex-col gap-1 py-4 text-sm md:flex-row md:items-center md:justify-between"
+                >
                   <div>
                     <p className="font-medium">{order.orderCode}</p>
                     <p className="text-xs text-slate-400">
                       {new Date(order.createdAt).toLocaleString()} · {order.status}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      链上：{order.onchainStatus}
+                      {order.transactionHash ? (
+                        <a
+                          className="ml-2 underline"
+                          href={`https://amoy.polygonscan.com/tx/${order.transactionHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          查看
+                        </a>
+                      ) : null}
                     </p>
                   </div>
                   <div className="text-right">
@@ -254,6 +328,62 @@ function MetricCard({ label, value }: { label: string; value: string }) {
     <div className="glass space-y-2 p-4">
       <p className="text-sm text-slate-400">{label}</p>
       <p className="text-2xl font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function WalletPanel({
+  status,
+  chainId,
+  onConnect,
+  loading,
+  onRefresh
+}: {
+  status: PointsSyncStatus | null;
+  chainId: string | null;
+  onConnect: () => void;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const connected = Boolean(status?.walletAddress);
+  return (
+    <div className="glass p-6">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-sm text-slate-400">钱包连接</p>
+          <p className="text-lg font-semibold">{connected ? status!.walletAddress : 'Wallet not connected'}</p>
+          {chainId ? <p className="text-xs text-slate-400">Chain ID: {parseInt(chainId, 16)}</p> : null}
+        </div>
+        <div className="flex gap-3">
+          <button className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:bg-white/10" onClick={onRefresh}>
+            刷新
+          </button>
+          <button
+            onClick={onConnect}
+            disabled={loading}
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white disabled:cursor-wait disabled:bg-brand/60"
+          >
+            {loading ? '连接中…' : connected ? '重新连接' : 'Connect Wallet'}
+          </button>
+        </div>
+      </div>
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <div className="rounded-2xl border border-white/10 p-4">
+          <p className="text-xs text-slate-400">本地积分</p>
+          <p className="text-2xl font-semibold">{status ? numberFormatter.format(status.localPoints) : '—'}</p>
+        </div>
+        <div className="rounded-2xl border border-white/10 p-4">
+          <p className="text-xs text-slate-400">链上积分 (Polygon Amoy)</p>
+          <p className="text-2xl font-semibold">
+            {status && status.onchainBalance !== null ? numberFormatter.format(status.onchainBalance) : '未配置'}
+          </p>
+          {status ? (
+            <p className="mt-1 text-xs text-slate-400">
+              同步状态：{status.status === 'synced' ? '已同步' : status.status === 'pending' ? '待同步' : '未配置'}
+            </p>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

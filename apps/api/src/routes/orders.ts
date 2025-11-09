@@ -15,6 +15,7 @@ ordersRouter.get('/', requireAuth, async (req, res, next) => {
       res.status(400).json({ message: '请提供可访问的 merchantId' });
       return;
     }
+
     const [rows] = await pool.query<Array<Order & RowDataPacket>>(
       `
         SELECT
@@ -50,8 +51,37 @@ ordersRouter.post('/', requireAuth, async (req, res, next) => {
       amount: Number(req.body?.amount),
       currency: req.body?.currency || 'USD'
     });
+
     if (!req.auth!.merchantIds.includes(parsed.merchantId)) {
       res.status(403).json({ message: '无权为该商户创建订单' });
+      return;
+    }
+
+    const [[merchant]] = await connection.query<
+      Array<
+        {
+          cashbackPercentage: number;
+          referralRewardPercentage: number;
+          walletAddress: string | null;
+          tokenId: number | null;
+        } & RowDataPacket
+      >
+    >(
+      `
+        SELECT
+          cashback_percentage AS cashbackPercentage,
+          referral_reward_percentage AS referralRewardPercentage,
+          wallet_address AS walletAddress,
+          token_id AS tokenId
+        FROM merchants
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [parsed.merchantId]
+    );
+
+    if (!merchant) {
+      res.status(404).json({ message: '商户不存在' });
       return;
     }
 
@@ -71,19 +101,6 @@ ordersRouter.post('/', requireAuth, async (req, res, next) => {
         return;
       }
       referralId = refRows[0].id;
-    }
-
-    const [merchantRows] = await connection.query<
-      Array<{ cashbackPercentage: number; referralRewardPercentage: number } & RowDataPacket>
-    >(
-      `SELECT cashback_percentage AS cashbackPercentage, referral_reward_percentage AS referralRewardPercentage
-       FROM merchants WHERE id = ? LIMIT 1`,
-      [parsed.merchantId]
-    );
-    const merchant = merchantRows[0];
-    if (!merchant) {
-      res.status(404).json({ message: '商户不存在' });
-      return;
     }
 
     const cashbackPoints = Math.floor((parsed.amount * merchant.cashbackPercentage) / 100);
@@ -126,10 +143,9 @@ ordersRouter.post('/', requireAuth, async (req, res, next) => {
         `,
         [randomUUID(), parsed.merchantId, req.auth!.profile.id, orderId, referralPoints]
       );
-      await connection.query(
-        `UPDATE referral_links SET usage_count = usage_count + 1, updated_at = NOW() WHERE id = ?`,
-        [referralId]
-      );
+      await connection.query(`UPDATE referral_links SET usage_count = usage_count + 1, updated_at = NOW() WHERE id = ?`, [
+        referralId
+      ]);
     }
 
     await connection.commit();
@@ -154,7 +170,30 @@ ordersRouter.post('/', requireAuth, async (req, res, next) => {
       `,
       [orderId]
     );
-    res.status(201).json(rows[0]);
+
+    const createdOrder = rows[0];
+    const mintedAmount = cashbackPoints + referralPoints;
+
+    if (merchant.walletAddress && merchant.tokenId && mintedAmount > 0) {
+      try {
+        const { isWeb3Enabled, mintPoints } = await import('../web3/pointsBridge');
+        if (isWeb3Enabled()) {
+          const { transactionHash } = await mintPoints(merchant.walletAddress, merchant.tokenId, mintedAmount);
+          await pool.query(`UPDATE orders SET transaction_hash = ?, onchain_status = 'synced' WHERE id = ?`, [
+            transactionHash,
+            orderId
+          ]);
+          createdOrder.onchainStatus = 'synced';
+          (createdOrder as any).transactionHash = transactionHash;
+        }
+      } catch (web3Error) {
+        console.error('[web3] mint failed', web3Error);
+        await pool.query(`UPDATE orders SET onchain_status = 'failed' WHERE id = ?`, [orderId]);
+        createdOrder.onchainStatus = 'failed';
+      }
+    }
+
+    res.status(201).json(createdOrder);
   } catch (error) {
     await connection.rollback();
     next(error);
