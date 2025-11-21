@@ -18,7 +18,7 @@ export async function apiFetch<TResponse>(path: string, options: FetchOptions = 
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    const err = new Error(body.message || `请求失败：${response.status}`) as Error & { status?: number };
+    const err = new Error(body.message || `Request failed: ${response.status}`) as Error & { status?: number };
     err.status = response.status;
     throw err;
   }

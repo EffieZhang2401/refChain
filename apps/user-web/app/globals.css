@@ -2,15 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg: #050814;
+  --bg-secondary: #0b1023;
+  --card: rgba(255, 255, 255, 0.04);
+  --card-border: rgba(255, 255, 255, 0.1);
+  --accent: #7cf2d4;
+  --accent-2: #7aa7ff;
+}
+
 body {
-  background: #0b1224;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(124, 242, 212, 0.18), transparent 35%),
+    radial-gradient(circle at 85% 10%, rgba(122, 167, 255, 0.22), transparent 40%),
+    linear-gradient(160deg, var(--bg), var(--bg-secondary));
   color: #e2e8f0;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Inter', 'Space Grotesk', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(124, 242, 212, 0.2);
+  color: #e6fffb;
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.38);
 }

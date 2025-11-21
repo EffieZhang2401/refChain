@@ -59,6 +59,9 @@ export default function Home() {
 
   if (!session) {
     return (
+      <main className="relative min-h-screen px-4 pb-16 pt-6">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(124,242,212,0.12),transparent_35%),radial-gradient(circle_at_90%_0%,rgba(122,167,255,0.16),transparent_32%)] blur-3xl" />
+        <div className="relative mx-auto max-w-6xl">
       <LoginCard
         onSubmit={handleLogin}
         loading={loading}
@@ -66,8 +69,17 @@ export default function Home() {
         mode={mode}
         onToggleMode={() => setMode(mode === 'login' ? 'signup' : 'login')}
       />
+        </div>
+      </main>
     );
   }
 
-  return <UserDashboard token={session.token} profileName={session.profileName} onLogout={handleLogout} />;
+  return (
+    <main className="relative min-h-screen px-4 pb-16 pt-6">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(124,242,212,0.12),transparent_35%),radial-gradient(circle_at_90%_0%,rgba(122,167,255,0.16),transparent_32%)] blur-3xl" />
+      <div className="relative mx-auto max-w-6xl">
+        <UserDashboard token={session.token} profileName={session.profileName} onLogout={handleLogout} />
+      </div>
+    </main>
+  );
 }

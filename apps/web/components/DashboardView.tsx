@@ -11,9 +11,9 @@ interface DashboardViewProps {
   onLogout: () => void;
 }
 
-const numberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 });
+const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const formatCurrency = (amount: number, currency: string) =>
-  new Intl.NumberFormat('zh-CN', { style: 'currency', currency }).format(amount);
+  new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 
 export default function DashboardView({ token, merchant, profileName, onLogout }: DashboardViewProps) {
   const [dashboard, setDashboard] = useState<MerchantDashboard | null>(null);
@@ -58,7 +58,7 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
     } finally {
       setLoading(false);
     }
-  }, [fetchDashboardData, fetchPointsStatus]);
+  }, [fetchDashboardData, fetchPointsStatus, onLogout]);
 
   useEffect(() => {
     fetchAll();
@@ -88,7 +88,7 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
     event.preventDefault();
     const amount = Number(orderForm.amount);
     if (Number.isNaN(amount) || amount <= 0) {
-      setError('请输入正确的订单金额');
+      setError('Enter a valid order amount');
       return;
     }
     try {
@@ -121,7 +121,7 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
 
   const handleConnectWallet = async () => {
     if (typeof window === 'undefined' || !(window as any).ethereum) {
-      setError('请先安装 MetaMask 或其它兼容钱包扩展');
+      setError('Please install MetaMask or another EVM wallet extension');
       return;
     }
     try {
@@ -149,15 +149,15 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
   };
 
   if (loading && !dashboard) {
-    return <p className="mt-20 text-center text-slate-300">加载数据中…</p>;
+    return <p className="mt-20 text-center text-slate-300">Loading data...</p>;
   }
 
   if (error && !dashboard) {
     return (
       <div className="glass mx-auto mt-12 max-w-xl p-8 text-center">
-        <p className="text-lg text-red-300">加载失败：{error}</p>
+        <p className="text-lg text-red-300">Failed to load: {error}</p>
         <button className="mt-4 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white" onClick={fetchAll}>
-          重试
+          Retry
         </button>
       </div>
     );
@@ -169,34 +169,37 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
 
   return (
     <section className="mx-auto max-w-6xl space-y-6 p-6 text-white">
-      <header className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-6 md:flex-row md:items-center md:justify-between">
+      <header className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-6">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-emerald-400/10 via-transparent to-blue-500/10" />
+        <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-sm uppercase tracking-wide text-slate-400">当前商户</p>
+          <p className="text-sm uppercase tracking-wide text-slate-400">Current merchant</p>
           <h1 className="text-3xl font-semibold">{dashboard.merchant.name}</h1>
           <p className="mt-1 text-sm text-slate-300">
-            行业：{dashboard.merchant.industry} · 返现 {dashboard.merchant.cashbackPercentage}% · 推荐奖励{' '}
+            Industry: {dashboard.merchant.industry} · Cashback {dashboard.merchant.cashbackPercentage}% · Referral reward{' '}
             {dashboard.merchant.referralRewardPercentage}%
           </p>
         </div>
         <div className="text-right text-sm text-slate-300">
           <p>{profileName}</p>
-          <p className="text-xs">上次刷新：{new Date(dashboard.refreshedAt).toLocaleString()}</p>
+          <p className="text-xs">Last refresh: {new Date(dashboard.refreshedAt).toLocaleString()}</p>
           <button
             onClick={onLogout}
             className="mt-3 inline-flex rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
           >
-            退出
+            Sign out
           </button>
+        </div>
         </div>
       </header>
 
       {error ? <p className="rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200">{error}</p> : null}
 
       <div className="grid gap-4 md:grid-cols-4">
-        <MetricCard label="总订单" value={numberFormatter.format(dashboard.totals.totalOrders)} />
-        <MetricCard label="待处理订单" value={numberFormatter.format(dashboard.totals.pendingOrders)} />
-        <MetricCard label="推荐使用次数" value={numberFormatter.format(dashboard.totals.totalReferralUses)} />
-        <MetricCard label="未结算积分" value={numberFormatter.format(dashboard.totals.totalPointsOutstanding)} />
+        <MetricCard label="Total orders" value={numberFormatter.format(dashboard.totals.totalOrders)} />
+        <MetricCard label="Pending orders" value={numberFormatter.format(dashboard.totals.pendingOrders)} />
+        <MetricCard label="Referral uses" value={numberFormatter.format(dashboard.totals.totalReferralUses)} />
+        <MetricCard label="Outstanding points" value={numberFormatter.format(dashboard.totals.totalPointsOutstanding)} />
       </div>
 
       <WalletPanel
@@ -210,13 +213,13 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="glass p-6 lg:col-span-2">
           <div className="flex items-center justify-between border-b border-white/10 pb-4">
-            <h2 className="text-lg font-semibold">最新订单</h2>
+            <h2 className="text-lg font-semibold">Latest orders</h2>
             <button className="text-sm text-slate-300" onClick={fetchAll}>
-              刷新
+              Refresh
             </button>
           </div>
           {orders.length === 0 ? (
-            <p className="mt-6 text-sm text-slate-300">暂无订单</p>
+            <p className="mt-6 text-sm text-slate-300">No orders yet.</p>
           ) : (
             <div className="divide-y divide-white/5">
               {orders.map((order) => (
@@ -230,7 +233,7 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
                       {new Date(order.createdAt).toLocaleString()} · {order.status}
                     </p>
                     <p className="text-xs text-slate-400">
-                      链上：{order.onchainStatus}
+                      On-chain: {order.onchainStatus}
                       {order.transactionHash ? (
                         <a
                           className="ml-2 underline"
@@ -238,7 +241,7 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
                           target="_blank"
                           rel="noreferrer"
                         >
-                          查看
+                          View
                         </a>
                       ) : null}
                     </p>
@@ -246,7 +249,7 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
                   <div className="text-right">
                     <p>{formatCurrency(order.amount, order.currency)}</p>
                     <p className="text-xs text-slate-400">
-                      +{numberFormatter.format(order.cashbackPoints + order.referralPoints)} 积分
+                      +{numberFormatter.format(order.cashbackPoints + order.referralPoints)} pts
                     </p>
                   </div>
                 </div>
@@ -258,23 +261,23 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
         <div className="glass space-y-6 p-6">
           <div>
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">推荐链接</h2>
+              <h2 className="text-lg font-semibold">Referral links</h2>
               <button
                 onClick={handleCreateReferral}
                 disabled={creatingReferral}
                 className="rounded-lg bg-brand px-3 py-1 text-sm font-semibold text-white disabled:cursor-wait disabled:bg-brand/60"
               >
-                {creatingReferral ? '生成中…' : '生成'}
+                {creatingReferral ? 'Generating…' : 'Generate'}
               </button>
             </div>
             {referrals.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-300">暂无推荐链接</p>
+              <p className="mt-4 text-sm text-slate-300">No referral links yet.</p>
             ) : (
               <ul className="mt-4 space-y-3 text-sm">
                 {topReferrals.map((referral) => (
                   <li key={referral.id} className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-2">
                     <span className="font-semibold">{referral.code}</span>
-                    <span className="text-xs text-slate-400">使用 {referral.usageCount}</span>
+                    <span className="text-xs text-slate-400">Uses {referral.usageCount}</span>
                   </li>
                 ))}
               </ul>
@@ -282,9 +285,9 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
           </div>
 
           <form className="space-y-3" onSubmit={handleOrderSubmit}>
-            <h2 className="text-lg font-semibold">模拟新订单</h2>
+            <h2 className="text-lg font-semibold">Create mock order</h2>
             <label className="text-sm text-slate-300">
-              买家邮箱
+              Buyer email
               <input
                 className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
                 value={orderForm.buyerEmail}
@@ -293,7 +296,7 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
               />
             </label>
             <label className="text-sm text-slate-300">
-              订单金额 (USD)
+              Order amount (USD)
               <input
                 className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
                 value={orderForm.amount}
@@ -302,7 +305,7 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
               />
             </label>
             <label className="text-sm text-slate-300">
-              推荐码（可选）
+              Referral code (optional)
               <input
                 className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
                 value={orderForm.referralCode}
@@ -314,7 +317,7 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
               disabled={creatingOrder}
               className="w-full rounded-lg bg-brand px-4 py-2 font-semibold text-white disabled:cursor-wait disabled:bg-brand/60"
             >
-              {creatingOrder ? '提交中…' : '创建订单'}
+              {creatingOrder ? 'Submitting…' : 'Create order'}
             </button>
           </form>
         </div>
@@ -325,9 +328,11 @@ export default function DashboardView({ token, merchant, profileName, onLogout }
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="glass space-y-2 p-4">
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className="text-2xl font-semibold">{value}</p>
+    <div className="glass relative overflow-hidden space-y-2 p-4">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-400/10 via-transparent to-blue-500/10" />
+      <p className="relative text-sm text-slate-300">{label}</p>
+      <p className="relative text-3xl font-semibold text-white">{value}</p>
+      <div className="relative h-1 w-14 rounded-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500" />
     </div>
   );
 }
@@ -350,36 +355,36 @@ function WalletPanel({
     <div className="glass p-6">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-sm text-slate-400">钱包连接</p>
+          <p className="text-sm text-slate-400">Wallet connection</p>
           <p className="text-lg font-semibold">{connected ? status!.walletAddress : 'Wallet not connected'}</p>
           {chainId ? <p className="text-xs text-slate-400">Chain ID: {parseInt(chainId, 16)}</p> : null}
         </div>
         <div className="flex gap-3">
           <button className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:bg-white/10" onClick={onRefresh}>
-            刷新
+            Refresh
           </button>
           <button
             onClick={onConnect}
             disabled={loading}
             className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white disabled:cursor-wait disabled:bg-brand/60"
           >
-            {loading ? '连接中…' : connected ? '重新连接' : 'Connect Wallet'}
+            {loading ? 'Connecting…' : connected ? 'Re-connect' : 'Connect Wallet'}
           </button>
         </div>
       </div>
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-white/10 p-4">
-          <p className="text-xs text-slate-400">本地积分</p>
-          <p className="text-2xl font-semibold">{status ? numberFormatter.format(status.localPoints) : '—'}</p>
+          <p className="text-xs text-slate-400">Local points</p>
+          <p className="text-2xl font-semibold">{status ? numberFormatter.format(status.localPoints) : '--'}</p>
         </div>
         <div className="rounded-2xl border border-white/10 p-4">
-          <p className="text-xs text-slate-400">链上积分 (Polygon Amoy)</p>
+          <p className="text-xs text-slate-400">On-chain points (Polygon Amoy)</p>
           <p className="text-2xl font-semibold">
-            {status && status.onchainBalance !== null ? numberFormatter.format(status.onchainBalance) : '未配置'}
+            {status && status.onchainBalance !== null ? numberFormatter.format(status.onchainBalance) : 'Not configured'}
           </p>
           {status ? (
             <p className="mt-1 text-xs text-slate-400">
-              同步状态：{status.status === 'synced' ? '已同步' : status.status === 'pending' ? '待同步' : '未配置'}
+              Sync status: {status.status === 'synced' ? 'Synced' : status.status === 'pending' ? 'Pending' : 'Not configured'}
             </p>
           ) : null}
         </div>

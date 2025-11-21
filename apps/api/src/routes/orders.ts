@@ -38,7 +38,7 @@ const ensureProfileByEmail = async (email: string) => {
     profileId = randomUUID();
     await pool.query(
       `INSERT INTO users (id, email, password_hash, login_provider, status, created_at, updated_at)
-       VALUES (?, ?, NULL, 'password', 'active', NOW(), NOW())`,
+       VALUES (?, ?, NULL, 'magic_link', 'active', NOW(), NOW())`,
       [userId, normalized]
     );
     await pool.query(
@@ -87,8 +87,9 @@ ordersRouter.get('/', requireAuth, async (req, res, next) => {
 });
 
 ordersRouter.post('/', requireAuth, async (req, res, next) => {
-  const connection = await pool.getConnection();
+  let connection: Awaited<ReturnType<typeof pool.getConnection>> | null = null;
   try {
+    connection = await pool.getConnection();
     const parsed = createOrderSchema.parse({
       ...req.body,
       amount: Number(req.body?.amount),
@@ -135,7 +136,11 @@ ordersRouter.post('/', requireAuth, async (req, res, next) => {
         `
           SELECT id, owner_profile_id AS ownerProfileId
           FROM referral_links
-          WHERE code = ? AND merchant_id = ?
+          WHERE code = ?
+            AND merchant_id = ?
+            AND is_active = 1
+            AND (max_uses IS NULL OR usage_count < max_uses)
+            AND (expires_at IS NULL OR expires_at > NOW())
           LIMIT 1
         `,
         [parsed.referralCode, parsed.merchantId]
@@ -220,9 +225,13 @@ ordersRouter.post('/', requireAuth, async (req, res, next) => {
 
     res.status(201).json(rows[0]);
   } catch (error) {
-    await connection.rollback();
+    if (connection) {
+      await connection.rollback();
+    }
     next(error);
   } finally {
-    connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 });

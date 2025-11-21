@@ -53,7 +53,7 @@ export default function HomePage() {
         body: JSON.stringify({ email, password })
       });
       if (!response.merchants.length) {
-        throw new Error('该账号尚未绑定商户');
+        throw new Error('No merchants linked to this account');
       }
       setSession({
         token: response.token,
@@ -73,7 +73,9 @@ export default function HomePage() {
   };
 
   return (
-    <main className="min-h-screen px-4 pb-12">
+    <main className="relative min-h-screen px-4 pb-16">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(124,242,212,0.1),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(122,167,255,0.14),transparent_32%)] blur-3xl" />
+      <div className="relative mx-auto max-w-6xl">
       {session && selectedMerchant ? (
         <DashboardView
           token={session.token}
@@ -84,6 +86,7 @@ export default function HomePage() {
       ) : (
         <LoginForm onSubmit={handleLogin} loading={loginLoading} error={loginError ?? undefined} />
       )}
+      </div>
     </main>
   );
 }

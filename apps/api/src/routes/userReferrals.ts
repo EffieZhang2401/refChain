@@ -41,11 +41,20 @@ userReferralRouter.get('/:code/info', async (req, res, next) => {
 });
 
 userReferralRouter.post('/click/:code', async (req, res, next) => {
-  const connection = await pool.getConnection();
+  let connection: Awaited<ReturnType<typeof pool.getConnection>> | null = null;
   try {
+    connection = await pool.getConnection();
     const code = req.params.code;
     const [refRows] = await connection.query<Array<{ id: string } & RowDataPacket>>(
-      `SELECT id FROM referral_links WHERE code = ? LIMIT 1`,
+      `
+        SELECT id
+        FROM referral_links
+        WHERE code = ?
+          AND is_active = 1
+          AND (max_uses IS NULL OR usage_count < max_uses)
+          AND (expires_at IS NULL OR expires_at > NOW())
+        LIMIT 1
+      `,
       [code]
     );
     if (!refRows.length) {
@@ -58,9 +67,13 @@ userReferralRouter.post('/click/:code', async (req, res, next) => {
     await connection.commit();
     res.json({ message: 'Referral click recorded', referralId });
   } catch (error) {
-    await connection.rollback();
+    if (connection) {
+      await connection.rollback();
+    }
     next(error);
   } finally {
-    connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 });
