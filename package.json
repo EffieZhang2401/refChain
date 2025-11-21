@@ -4,14 +4,17 @@
   "version": "0.1.0",
   "workspaces": [
     "apps/*",
+    "apps/user-*",
     "contracts"
   ],
   "scripts": {
     "dev:api": "npm --workspace apps/api run dev",
     "dev:web": "npm --workspace apps/web run dev",
+    "dev:web:user": "npm --workspace apps/user-web run dev",
     "dev:contracts": "npm --workspace contracts run compile",
     "build:api": "npm --workspace apps/api run build",
     "build:web": "npm --workspace apps/web run build",
+    "build:web:user": "npm --workspace apps/user-web run build",
     "lint:web": "npm --workspace apps/web run lint",
     "test:contracts": "npm --workspace contracts run test"
   },

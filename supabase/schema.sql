@@ -7,6 +7,7 @@ CREATE TABLE users (
   email VARCHAR(320) NOT NULL UNIQUE,
   password_hash TEXT,
   password_salt TEXT,
+  wallet_address VARCHAR(255) UNIQUE,
   login_provider ENUM('password', 'magic_link', 'wallet') NOT NULL DEFAULT 'password',
   is_email_verified BOOLEAN NOT NULL DEFAULT FALSE,
   status ENUM('pending', 'active', 'suspended', 'deleted') NOT NULL DEFAULT 'pending',

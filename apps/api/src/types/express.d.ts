@@ -8,6 +8,10 @@ declare global {
         profile: Profile;
         merchantIds: string[];
       };
+      userAuth?: {
+        user: User;
+        profile: Profile;
+      };
     }
   }
 }

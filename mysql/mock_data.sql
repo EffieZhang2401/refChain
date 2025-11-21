@@ -12,13 +12,14 @@ TRUNCATE TABLE users;
 SET FOREIGN_KEY_CHECKS = 1;
 
 INSERT INTO users (
-  id, email, password_hash, login_provider, is_email_verified, status,
+  id, email, password_hash, login_provider, wallet_address, is_email_verified, status,
   created_at, updated_at
 ) VALUES (
   'usr_demo_owner',
   'merchant@test.com',
   '123456',
   'password',
+  NULL,
   1,
   'active',
   NOW(),

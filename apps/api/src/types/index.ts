@@ -5,6 +5,7 @@ export interface User {
   id: string;
   email: string;
   passwordHash: string | null;
+  walletAddress?: string | null;
   loginProvider: LoginProvider;
   status: UserStatus;
   profileId: string;

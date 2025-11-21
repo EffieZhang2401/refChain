@@ -8,6 +8,49 @@ import type { Order } from '../types';
 
 export const ordersRouter = Router();
 
+const ensureProfileByEmail = async (email: string) => {
+  const normalized = email.toLowerCase();
+  const [userRows] = await pool.query<Array<{ id: string } & RowDataPacket>>(
+    `SELECT id FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1`,
+    [normalized]
+  );
+  let userId: string;
+  let profileId: string;
+
+  if (userRows.length) {
+    userId = userRows[0].id;
+    const [profileRows] = await pool.query<Array<{ id: string } & RowDataPacket>>(
+      `SELECT id FROM profiles WHERE user_id = ? LIMIT 1`,
+      [userId]
+    );
+    if (profileRows.length) {
+      profileId = profileRows[0].id;
+    } else {
+      profileId = randomUUID();
+      await pool.query(
+        `INSERT INTO profiles (id, user_id, display_name, locale, timezone, created_at, updated_at)
+         VALUES (?, ?, ?, 'en-US', 'UTC', NOW(), NOW())`,
+        [profileId, userId, normalized.split('@')[0]]
+      );
+    }
+  } else {
+    userId = randomUUID();
+    profileId = randomUUID();
+    await pool.query(
+      `INSERT INTO users (id, email, password_hash, login_provider, status, created_at, updated_at)
+       VALUES (?, ?, NULL, 'password', 'active', NOW(), NOW())`,
+      [userId, normalized]
+    );
+    await pool.query(
+      `INSERT INTO profiles (id, user_id, display_name, locale, timezone, created_at, updated_at)
+       VALUES (?, ?, ?, 'en-US', 'UTC', NOW(), NOW())`,
+      [profileId, userId, normalized.split('@')[0]]
+    );
+  }
+
+  return profileId;
+};
+
 ordersRouter.get('/', requireAuth, async (req, res, next) => {
   try {
     const merchantId = (req.query.merchantId as string) ?? req.auth!.merchantIds[0];
@@ -86,10 +129,11 @@ ordersRouter.post('/', requireAuth, async (req, res, next) => {
     }
 
     let referralId: string | null = null;
+    let referralOwnerProfileId: string | null = null;
     if (parsed.referralCode) {
       const [refRows] = await connection.query<Array<{ id: string } & RowDataPacket>>(
         `
-          SELECT id
+          SELECT id, owner_profile_id AS ownerProfileId
           FROM referral_links
           WHERE code = ? AND merchant_id = ?
           LIMIT 1
@@ -101,7 +145,10 @@ ordersRouter.post('/', requireAuth, async (req, res, next) => {
         return;
       }
       referralId = refRows[0].id;
+      referralOwnerProfileId = (refRows as any)[0].ownerProfileId;
     }
+
+    const buyerProfileId = await ensureProfileByEmail(parsed.buyerEmail);
 
     const cashbackPoints = Math.floor((parsed.amount * merchant.cashbackPercentage) / 100);
     const referralPoints = referralId ? Math.floor((parsed.amount * merchant.referralRewardPercentage) / 100) : 0;
@@ -130,18 +177,18 @@ ordersRouter.post('/', requireAuth, async (req, res, next) => {
             id, merchant_id, profile_id, order_id, points, direction, source, created_at
           ) VALUES (?, ?, ?, ?, ?, 'credit', 'cashback', NOW())
         `,
-        [randomUUID(), parsed.merchantId, req.auth!.profile.id, orderId, cashbackPoints]
+        [randomUUID(), parsed.merchantId, buyerProfileId, orderId, cashbackPoints]
       );
     }
 
-    if (referralId && referralPoints > 0) {
+    if (referralId && referralPoints > 0 && referralOwnerProfileId) {
       await connection.query(
         `
           INSERT INTO point_ledger (
             id, merchant_id, profile_id, order_id, points, direction, source, created_at
           ) VALUES (?, ?, ?, ?, ?, 'credit', 'referral', NOW())
         `,
-        [randomUUID(), parsed.merchantId, req.auth!.profile.id, orderId, referralPoints]
+        [randomUUID(), parsed.merchantId, referralOwnerProfileId, orderId, referralPoints]
       );
       await connection.query(`UPDATE referral_links SET usage_count = usage_count + 1, updated_at = NOW() WHERE id = ?`, [
         referralId
@@ -171,29 +218,7 @@ ordersRouter.post('/', requireAuth, async (req, res, next) => {
       [orderId]
     );
 
-    const createdOrder = rows[0];
-    const mintedAmount = cashbackPoints + referralPoints;
-
-    if (merchant.walletAddress && merchant.tokenId && mintedAmount > 0) {
-      try {
-        const { isWeb3Enabled, mintPoints } = await import('../web3/pointsBridge');
-        if (isWeb3Enabled()) {
-          const { transactionHash } = await mintPoints(merchant.walletAddress, merchant.tokenId, mintedAmount);
-          await pool.query(`UPDATE orders SET transaction_hash = ?, onchain_status = 'synced' WHERE id = ?`, [
-            transactionHash,
-            orderId
-          ]);
-          createdOrder.onchainStatus = 'synced';
-          (createdOrder as any).transactionHash = transactionHash;
-        }
-      } catch (web3Error) {
-        console.error('[web3] mint failed', web3Error);
-        await pool.query(`UPDATE orders SET onchain_status = 'failed' WHERE id = ?`, [orderId]);
-        createdOrder.onchainStatus = 'failed';
-      }
-    }
-
-    res.status(201).json(createdOrder);
+    res.status(201).json(rows[0]);
   } catch (error) {
     await connection.rollback();
     next(error);
