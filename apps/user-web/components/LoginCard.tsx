@@ -34,9 +34,6 @@ export default function LoginCard({ onSubmit, loading, error, mode, onToggleMode
               : 'Create an account to start collecting points from your purchases.'}
           </p>
         </div>
-        <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">
-          Web3-ready
-        </span>
       </div>
       <label className="block text-sm text-slate-200">
         Email

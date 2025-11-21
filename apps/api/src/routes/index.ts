@@ -8,6 +8,7 @@ import { dashboardRouter } from './dashboard';
 import { pointsRouter } from './points';
 import { userRouter } from './user';
 import { userReferralRouter } from './userReferrals';
+import { userRewardsRouter } from './userRewards';
 
 export const apiRouter = Router();
 
@@ -20,3 +21,4 @@ apiRouter.use('/dashboard', dashboardRouter);
 apiRouter.use('/points', pointsRouter);
 apiRouter.use('/user', userRouter);
 apiRouter.use('/user/referrals', userReferralRouter);
+apiRouter.use('/user', userRewardsRouter);

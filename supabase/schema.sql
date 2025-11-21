@@ -217,6 +217,55 @@ CREATE TABLE audit_logs (
   CONSTRAINT fk_audit_logs_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id)
 );
 
+-- Coupons: catalog + issued coupons
+CREATE TABLE coupon_catalog (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  merchant_id CHAR(36) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  points_required INT NOT NULL CHECK (points_required > 0),
+  expires_at DATE NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_coupon_catalog_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE
+);
+
+CREATE INDEX coupon_catalog_merchant_idx ON coupon_catalog(merchant_id, is_active);
+
+CREATE TABLE coupons (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  profile_id CHAR(36) NOT NULL,
+  merchant_id CHAR(36) NOT NULL,
+  catalog_id CHAR(36) NOT NULL,
+  code VARCHAR(255) NOT NULL UNIQUE,
+  points_spent INT NOT NULL CHECK (points_spent > 0),
+  status ENUM('active', 'redeemed', 'expired') NOT NULL DEFAULT 'active',
+  expires_at DATE NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_coupons_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_coupons_profile FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_coupons_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
+  CONSTRAINT fk_coupons_catalog FOREIGN KEY (catalog_id) REFERENCES coupon_catalog(id) ON DELETE CASCADE
+);
+
+CREATE INDEX coupons_user_idx ON coupons(user_id, merchant_id);
+
+-- Loyalty token redemption log
+CREATE TABLE token_redemptions (
+  id CHAR(36) PRIMARY KEY DEFAULT(UUID()),
+  user_id CHAR(36) NOT NULL,
+  merchant_id CHAR(36) NOT NULL,
+  points_spent INT NOT NULL,
+  token_amount INT NOT NULL,
+  tx_hash VARCHAR(255),
+  status ENUM('pending','success','failed') DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_token_redemptions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_token_redemptions_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE
+);
+
 -- 存储过程：对应 PostgreSQL 里的 increment_referral_usage()
 DELIMITER $$
 

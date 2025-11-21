@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api';
 type Session = {
   token: string;
   profileName: string;
+  userId: string;
 };
 
 const storageKey = 'refchain-user-session';
@@ -22,7 +23,13 @@ export default function Home() {
   useEffect(() => {
     const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
     if (stored) {
-      setSession(JSON.parse(stored));
+      try {
+        const parsed = JSON.parse(stored) as Session;
+        if (!parsed.userId || !parsed.token) throw new Error('invalid session');
+        setSession(parsed);
+      } catch {
+        window.localStorage.removeItem(storageKey);
+      }
     }
   }, []);
 
@@ -49,7 +56,7 @@ export default function Home() {
         method: 'POST',
         body: JSON.stringify({ email, password })
       });
-      setSession({ token: resp.token, profileName: resp.profile.displayName });
+      setSession({ token: resp.token, profileName: resp.profile.displayName, userId: resp.userId });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -78,7 +85,7 @@ export default function Home() {
     <main className="relative min-h-screen px-4 pb-16 pt-6">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(124,242,212,0.12),transparent_35%),radial-gradient(circle_at_90%_0%,rgba(122,167,255,0.16),transparent_32%)] blur-3xl" />
       <div className="relative mx-auto max-w-6xl">
-        <UserDashboard token={session.token} profileName={session.profileName} onLogout={handleLogout} />
+        <UserDashboard token={session.token} profileName={session.profileName} userId={session.userId} onLogout={handleLogout} />
       </div>
     </main>
   );

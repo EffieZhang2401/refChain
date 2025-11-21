@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import type { PointsRow, TransactionRow, ReferralInfo } from '@/types';
@@ -7,10 +8,11 @@ import type { PointsRow, TransactionRow, ReferralInfo } from '@/types';
 interface Props {
   token: string;
   profileName: string;
+  userId: string;
   onLogout: () => void;
 }
 
-export default function UserDashboard({ token, profileName, onLogout }: Props) {
+export default function UserDashboard({ token, profileName, userId, onLogout }: Props) {
   const [points, setPoints] = useState<PointsRow[]>([]);
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(null);
@@ -60,7 +62,6 @@ export default function UserDashboard({ token, profileName, onLogout }: Props) {
           <p className="mt-1 text-sm text-slate-300">View balances, referrals, and transaction history.</p>
         </div>
         <div className="flex items-center gap-3 text-sm text-slate-300">
-          <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">Web3 ready</span>
           <button
             onClick={onLogout}
             className="rounded-lg border border-white/20 px-3 py-2 text-white transition hover:bg-white/10"
@@ -79,10 +80,26 @@ export default function UserDashboard({ token, profileName, onLogout }: Props) {
             className="card relative overflow-hidden p-5"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/10 via-transparent to-blue-500/10" />
-            <div className="relative">
-              <p className="text-sm text-slate-300">{row.merchantName}</p>
-              <p className="mt-2 text-3xl font-semibold">{row.balance} pts</p>
-              <p className="mt-1 text-xs text-slate-400">Available balance</p>
+            <div className="relative space-y-3">
+              <div>
+                <p className="text-sm text-slate-300">{row.merchantName}</p>
+                <p className="mt-2 text-3xl font-semibold">{row.balance} pts</p>
+                <p className="mt-1 text-xs text-slate-400">Available balance</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-sm">
+                <Link
+                  href={`/merchant/${row.merchantId}`}
+                  className="rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold text-white transition hover:border-emerald-300 hover:text-emerald-200"
+                >
+                  Redeem coupon
+                </Link>
+                <Link
+                  href={`/merchant/${row.merchantId}/token`}
+                  className="rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold text-white transition hover:border-emerald-300 hover:text-emerald-200"
+                >
+                  Redeem token
+                </Link>
+              </div>
             </div>
           </div>
         ))}

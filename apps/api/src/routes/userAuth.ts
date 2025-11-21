@@ -35,7 +35,7 @@ userAuthRouter.post('/signup', async (req, res, next) => {
       [profileId, userId, displayName]
     );
     const token = createSession(userId);
-    res.status(201).json({ token, profile: { id: profileId, displayName } });
+    res.status(201).json({ token, userId, profile: { id: profileId, displayName } });
   } catch (error) {
     next(error);
   }
@@ -60,6 +60,7 @@ userAuthRouter.post('/login', async (req, res, next) => {
     const token = createSession(row.id);
     res.json({
       token,
+      userId: row.id,
       profile: profile ? { id: profile.id, displayName: profile.display_name } : null
     });
   } catch (error) {
