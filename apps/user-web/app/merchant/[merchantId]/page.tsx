@@ -138,26 +138,29 @@ export default function MerchantCouponsPage() {
           {catalog && catalog.catalog.length === 0 ? (
             <p className="text-sm text-slate-300">No coupons available right now.</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {catalog?.catalog.map((item) => {
                 const disabled = balance < item.pointsRequired || Boolean(redeemingId);
                 const insufficient = balance < item.pointsRequired;
                 return (
                   <div
                     key={item.id}
-                    className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-4 md:flex-row md:items-center md:justify-between"
+                    className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-slate-950/90 p-5 shadow-lg shadow-black/20 md:flex-row md:items-center md:justify-between"
                   >
-                    <div>
-                      <p className="text-base font-semibold text-white">{item.title}</p>
+                    <div className="space-y-1">
+                      <p className="text-2xl font-semibold text-white">{item.title}</p>
                       {item.description ? <p className="text-sm text-slate-300">{item.description}</p> : null}
-                      <p className="text-xs text-slate-400">
-                        Cost: {item.pointsRequired} pts {item.expiresAt ? `· Expires ${item.expiresAt}` : ''}
+                      <p className="text-xs uppercase tracking-[0.25em] text-slate-400">
+                        {item.pointsRequired} pts to redeem
                       </p>
+                      {item.expiresAt ? (
+                        <p className="text-xs text-slate-500">Valid until {item.expiresAt}</p>
+                      ) : null}
                     </div>
                     <button
                       onClick={() => handleRedeem(item.id)}
                       disabled={disabled}
-                      className="rounded-lg bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500 px-4 py-2 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-500/30 transition hover:shadow-emerald-400/50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-black/20 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {redeemingId === item.id ? 'Redeeming...' : insufficient ? 'Not enough points' : 'Redeem'}
                     </button>

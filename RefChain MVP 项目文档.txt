@@ -1,4 +1,4 @@
-﻿RefChain MVP 项目文档（使用Supabase）
+﻿RefChain MVP 项目
 1. 技术栈概述
 前端技术
 * 框架: Next.js（React框架）

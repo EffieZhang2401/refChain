@@ -38,10 +38,15 @@ npm run dev:api   # API on http://localhost:4000
 npm run dev:web   # Web on http://localhost:3000
 ```
 
-Log in at `http://localhost:3000` using:
+Log in:
 
-- Email: `merchant@test.com`
-- Password: `123456`
+- **Merchant dashboard:** `http://localhost:3000`  
+  - Email: `merchant@test.com`  
+  - Password: `123456`  
+  - RefChain Studio already has sample $5/$10/$15 coupons after you run the seed script above.
+- **User rewards site:** `http://localhost:3001` (or the `apps/user-web` dev server)  
+  - Email: `andysu@gmail.com`  
+  - Password: `123456`
 
 ---
 
