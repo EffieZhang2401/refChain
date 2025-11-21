@@ -11,8 +11,8 @@ interface Props {
 }
 
 export default function LoginCard({ onSubmit, loading, error, mode, onToggleMode }: Props) {
-  const [email, setEmail] = useState('user@test.com');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('andysu@gmail.com');
+  const [password, setPassword] = useState('12345');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
