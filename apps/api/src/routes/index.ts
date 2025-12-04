@@ -9,12 +9,14 @@ import { pointsRouter } from './points';
 import { userRouter } from './user';
 import { userReferralRouter } from './userReferrals';
 import { userRewardsRouter } from './userRewards';
+import { merchantCouponsRouter } from './coupons';
 
 export const apiRouter = Router();
 
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/user/auth', userAuthRouter);
 apiRouter.use('/merchants', merchantsRouter);
+apiRouter.use('/coupons', merchantCouponsRouter);
 apiRouter.use('/referrals', referralsRouter);
 apiRouter.use('/orders', ordersRouter);
 apiRouter.use('/dashboard', dashboardRouter);

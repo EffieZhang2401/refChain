@@ -68,3 +68,38 @@ export interface PointsSyncStatus {
   onchainBalance: number | null;
   status: 'synced' | 'pending' | 'not_configured';
 }
+
+export interface MerchantCouponCatalogItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  pointsRequired: number;
+  expiresAt?: string | null;
+  isActive: boolean;
+  issuedCount: number;
+  redeemedCount: number;
+  activeCoupons: number;
+}
+
+export interface MerchantIssuedCoupon {
+  id: string;
+  catalogId: string;
+  code: string;
+  status: 'active' | 'redeemed' | 'expired';
+  expiresAt?: string | null;
+  pointsSpent: number;
+  createdAt: string;
+  profileName?: string | null;
+}
+
+export interface MerchantCouponOverview {
+  merchant: { id: string; name: string };
+  stats: {
+    totalCatalogs: number;
+    activeCatalogs: number;
+    totalIssued: number;
+    totalRedeemed: number;
+  };
+  catalog: MerchantCouponCatalogItem[];
+  recentCoupons: MerchantIssuedCoupon[];
+}
