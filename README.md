@@ -1,24 +1,45 @@
 # RefChain MVP
 
-Full-stack referral and loyalty demo using MySQL, Express, Next.js 14, and an optional Polygon Amoy ERC-1155 bridge. The monorepo contains:
+## Overview
+RefChain gives small merchants a simple, transparent loyalty and referral system while letting members earn, own, and track rewards across multiple merchants. Built on a Web3-ready foundation, points stay portable and can be redeemed into on-chain tokens without locking merchants into new payment rails.
+
+This MVP shows the full flow of a referral and loyalty product using MySQL, Express, Next.js 14, and an optional Polygon Amoy ERC-1155 bridge. It includes both a merchant console and a member portal plus an extensible smart contract layer, specifically:
+
 - `apps/api` – Express API with zod validation, MySQL persistence, and optional Polygon balance checks / minting.
 - `apps/web` – Merchant console (login, dashboard, mock orders, referral code generation, coupon catalog, wallet connect).
 - `apps/user-web` – Member portal (sign up/login, balances, transactions, referral lookup, coupon + token redemption).
 - `contracts` – Hardhat project with `MultiMerchantPoints` ERC-1155 for Polygon Amoy.
 
-## What’s supported
-- Email/password auth for merchants and members; bearer tokens are stored in-memory (restart clears sessions).
-- Merchant dashboard: KPIs, latest orders, top referrals, create referral codes, create mock orders (cashback/referral points ledgered), view coupon catalog + issued coupons, connect wallet for on-chain balance checks, update merchant token id via API.
-- Member portal: view balances per merchant, view ledger transactions, lookup referral code info, redeem coupons from merchant catalogs, redeem ERC-1155 tokens to a wallet when Web3 is configured.
-- API surface in `apps/api/src/routes`: `/auth/login`, `/merchants`, `/orders`, `/referrals`, `/dashboard`, `/coupons/catalog` plus user-focused `/user/auth`, `/user/points`, `/user/transactions`, `/user/referrals/:code/info`, `/user/:userId/redeem-coupon`, `/user/:userId/redeem-token`, etc. All protected routes expect `Authorization: Bearer <token>`.
 
-## Prerequisites
+## Supported Features
+
+**Merchant**
+- Email/password auth; in-memory sessions.
+- Dashboard with KPIs, latest orders, referral performance.
+- Create referral codes and mock orders (cashback/referral points recorded off-chain).
+- Coupon catalog management and issuance history.
+- Connect wallet for on-chain balance checks; set merchant token ID.
+- CSV-like visibility via dashboard and API.
+
+**Member**
+- Sign in, view balances per merchant, inspect transaction history.
+- Referral code lookup and attribution.
+- Redeem coupons from merchant catalogs.
+- Redeem ERC-1155 tokens to a wallet when Web3 settings are provided.
+
+**API**
+- Routes include `/auth/login`, `/merchants`, `/orders`, `/referrals`, `/dashboard`, `/coupons/catalog` plus user-scoped `/user/auth`, `/user/points`, `/user/transactions`, `/user/referrals/:code/info`, `/user/:userId/redeem-coupon`, `/user/:userId/redeem-token`.
+- All protected routes expect `Authorization: Bearer <token>`.
+
+## Local Development Setup
+
+### Prerequisites
 - Node.js >= 18.18
 - MySQL 8.x with a database named `refchain`
 - npm 9+ (workspaces enabled)
 - Optional: MetaMask on Polygon Amoy, Hardhat (for contract deploys)
 
-## Install dependencies
+### Install Dependencies
 From repository root:
 ```bash
 npm install
@@ -29,7 +50,7 @@ npm --workspace apps/user-web install
 npm --workspace contracts install
 ```
 
-## Configure environment
+### Configure Environment
 Copy the template and fill in DB + Polygon settings:
 ```bash
 cp .env.example .env
@@ -39,7 +60,7 @@ Important variables (all read by `apps/api`, Next.js apps read `NEXT_PUBLIC_API_
 - `POLYGON_AMOY_RPC_URL`, `WEB3_PRIVATE_KEY`, `POINTS_CONTRACT_ADDRESS` – needed only for on-chain balance checks and token minting.
 - `NEXT_PUBLIC_API_BASE_URL` – defaults to `http://localhost:4000/api`; change if you host the API elsewhere.
 
-## Initialize the database
+### Initialize the Database
 Run against your MySQL instance (replace host/port/user as needed):
 ```bash
 mysql -h <host> -P <port> -u <user> -p refchain < supabase/schema.sql      # schema
@@ -52,7 +73,7 @@ mysql -h 35.236.223.1 -P 3306 -u root -p refchain < mysql/mock_data.sql
 # password: Refchain@123
 ```
 
-## Run the stack locally
+### Run the Stack Locally
 ```bash
 npm run dev:api        # http://localhost:4000
 npm run dev:web        # http://localhost:3000 (merchant console)
@@ -64,7 +85,7 @@ Demo accounts from `mysql/mock_data.sql`:
 - Merchant console `apps/web`: email `merchant@test.com`, password `123456` (has “RefChain Studio” merchant with sample coupons).
 - Member portal `apps/user-web`: email `andysu@gmail.com`, password `123456`.
 
-## Optional Polygon Amoy bridge
+### Optional Polygon Amoy Web3 Bridge
 1. Deploy `contracts/contracts/MultiMerchantPoints.sol` (ERC-1155) to Polygon Amoy:
    ```bash
    npm --workspace contracts run deploy:amoy
@@ -75,12 +96,12 @@ Demo accounts from `mysql/mock_data.sql`:
 
 Without these variables the app stays in “not configured” mode; all off-chain features continue to work.
 
-## Notes on API/auth
+## Notes on API & Auth
 - Sessions are in-memory (`apps/api/src/sessionStore.ts`); restarting the API invalidates tokens.
 - Order creation (`POST /api/orders`) computes cashback/referral points and writes `point_ledger`. On-chain minting only happens when a member redeems tokens via `/api/user/:userId/redeem-token`.
 - Coupon catalog + issuance live under `/api/coupons/catalog` (merchant) and `/api/user/:userId/redeem-coupon` (member).
 
-## Repository map
+## Repository Map
 - `apps/api/src/routes` – Express routers for auth, merchants, orders, referrals, dashboard, coupons, user flows.
 - `apps/web` – Next.js 14 merchant UI components (`LoginForm`, `DashboardView`) and API helper.
 - `apps/user-web` – Next.js 14 member UI (`LoginCard`, `UserDashboard`, coupon/token pages) and API helper.
@@ -88,9 +109,9 @@ Without these variables the app stays in “not configured” mode; all off-chai
 - `supabase/schema.sql` / `mysql/mock_data.sql` – schema + demo seed data.
 
 
-# RefChain MVP — Architecture (current code)
+## Architecture Overview
 
-## Stack flow
+### System Architecture
 ```text
 Next.js apps (merchant console, member portal)
       │  REST (Bearer token)
@@ -109,7 +130,7 @@ Optional: Polygon Amoy via MultiMerchantPoints (ethers.js)
 - **Tokens / Web3**: on-chain minting only occurs in `/api/user/:userId/redeem-token`; regular orders stay off-chain. On-chain balance checks compare `point_ledger` totals with ERC-1155 `balanceOf` when wallet + token id + RPC/private key are configured.
 - **Contracts**: `contracts/contracts/MultiMerchantPoints.sol` assigns one ERC-1155 token id per merchant; deploy with `npm --workspace contracts run deploy:amoy`.
 
-## Data model notes (MySQL)
+### Data Model Notes (MySQL)
 - `users` / `profiles`: canonical identity; seed passwords are plaintext for demo.
 - `merchants` + `merchant_members`: merchant metadata and access control; wallet + token id live on `merchants`.
 - `referral_links`: per-merchant codes with usage counts and activity flags.
@@ -121,7 +142,7 @@ Optional: Polygon Amoy via MultiMerchantPoints (ethers.js)
 - `point_ledger`: append-only credits/debits tied to merchant + profile + order, allowing audits and reversals.
 - `sync_tasks`: outbox table describing pending blockchain actions (`mint_points`, `revoke_points`) with payload JSON, retries, and last error.
 
-## 4. API slice
+### API Surface
 - `POST /api/merchants` – create a merchant bound to the authenticated profile.
 - `GET /api/merchants` / `GET /api/merchants/:id` – list merchants or fetch detail.
 - `POST /api/referrals` – generate a referral code with optional max uses/expiry.
@@ -131,18 +152,18 @@ Optional: Polygon Amoy via MultiMerchantPoints (ethers.js)
 - `GET /api/dashboard/merchant` – aggregated KPIs (orders, referral usage, outstanding points).
 - `GET /api/auth/profile` – returns the hydrated profile for the caller (Magic DID token required).
 
-## 5. Frontend design
+### Frontend Design
 - App Router with nested client components for login and the dashboard.
 - `LoginCard` uses the Magic SDK to obtain a DID token, then calls `/api/auth/profile`.
 - `useMerchantDashboard` (SWR) consumes `/api/dashboard/merchant` with the DID token header and powers stat cards, order timelines, and referral leaderboards.
 - Tailwind + CSS variables provide theming, while React Hot Toast surfaces API feedback.
 
-## 6. Blockchain + sync
+### Blockchain & Sync
 - `contracts/MultiMerchantPoints.sol` implements ERC-1155 with `MINTER_ROLE` and `registerMerchant` for deterministic token IDs per merchant.
 - `contracts/scripts/deploy.ts` deploys to Polygon Amoy and prints the address so it can be copied into the API env.
 - The API stores on-chain `token_id` per merchant and writes `sync_tasks` rows whenever ledger credits need minting. A worker (implemented later) reads the tasks, invokes the contract via ethers, and updates `sync_tasks.status` + `orders.onchain_status`.
 
-## 7. Development workflow
+### Development Workflow
 1. Apply `supabase/schema.sql` to a fresh Supabase project.
 2. Configure Magic.link (publishable + secret keys) and drop them into `.env`.
 3. Run `npm run dev:api` (port 4000) and `npm run dev:web` (port 3000).
