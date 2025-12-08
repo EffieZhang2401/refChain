@@ -1,5 +1,8 @@
 # RefChain MVP
 
+### Team Member: Yifei Zhang, Yile Xu, Jing Wang, Ziyang Su, Zixiang Qu
+
+
 ## Overview
 RefChain gives small merchants a simple, transparent loyalty and referral system while letting members earn, own, and track rewards across multiple merchants. Built on a Web3-ready foundation, points stay portable and can be redeemed into on-chain tokens without locking merchants into new payment rails.
 
@@ -50,29 +53,6 @@ npm --workspace apps/user-web install
 npm --workspace contracts install
 ```
 
-### Configure Environment
-Copy the template and fill in DB + Polygon settings:
-```bash
-cp .env.example .env
-```
-Important variables (all read by `apps/api`, Next.js apps read `NEXT_PUBLIC_API_BASE_URL`):
-- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` – MySQL connection (defaults point to the demo DB).
-- `POLYGON_AMOY_RPC_URL`, `WEB3_PRIVATE_KEY`, `POINTS_CONTRACT_ADDRESS` – needed only for on-chain balance checks and token minting.
-- `NEXT_PUBLIC_API_BASE_URL` – defaults to `http://localhost:4000/api`; change if you host the API elsewhere.
-
-### Initialize the Database
-Run against your MySQL instance (replace host/port/user as needed):
-```bash
-mysql -h <host> -P <port> -u <user> -p refchain < supabase/schema.sql      # schema
-mysql -h <host> -P <port> -u <user> -p refchain < mysql/mock_data.sql      # optional seed
-```
-
-Example using the provided demo DB credentials:
-```bash
-mysql -h 35.236.223.1 -P 3306 -u root -p refchain < mysql/mock_data.sql
-# password: Refchain@123
-```
-
 ### Run the Stack Locally
 ```bash
 npm run dev:api        # http://localhost:4000
@@ -81,7 +61,7 @@ npm run dev:web:user   # http://localhost:3001 (member portal)
 ```
 Available builds: `npm run build:api`, `npm run build:web`, `npm run build:web:user`. Hardhat: `npm run dev:contracts` (compile) and `npm --workspace contracts run deploy:amoy`.
 
-Demo accounts from `mysql/mock_data.sql`:
+**Demo Accounts** from `mysql/mock_data.sql`:
 - Merchant console `apps/web`: email `merchant@test.com`, password `123456` (has “RefChain Studio” merchant with sample coupons).
 - Member portal `apps/user-web`: email `andysu@gmail.com`, password `123456`.
 
