@@ -1,6 +1,6 @@
 # RefChain MVP
 
-### Team Member: Yifei Zhang, Yile Xu, Jing Wang, Ziyang Su, Zixiang Qu
+### Team Member: Yifei Zhang (yz4912), Yile Xu(yx2931), Jing Wang(jw4610), Ziyang Su(zs2694), Zixiang Qu(zq2231)
 
 
 ## Overview
@@ -65,7 +65,7 @@ Available builds: `npm run build:api`, `npm run build:web`, `npm run build:web:u
 - Merchant console `apps/web`: email `merchant@test.com`, password `123456` (has “RefChain Studio” merchant with sample coupons).
 - Member portal `apps/user-web`: email `andysu@gmail.com`, password `123456`.
 
-### Optional Polygon Amoy Web3 Bridge
+### Optional Polygon Amoy Web3 Bridge (not use in the demo)
 1. Deploy `contracts/contracts/MultiMerchantPoints.sol` (ERC-1155) to Polygon Amoy:
    ```bash
    npm --workspace contracts run deploy:amoy
