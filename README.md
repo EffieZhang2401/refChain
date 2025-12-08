@@ -1,4 +1,4 @@
-# RefChain MVP
+# RefChain Final Report
 
 ### Team Member: Yifei Zhang (yz4912), Yile Xu(yx2931), Jing Wang(jw4610), Ziyang Su(zs2694), Zixiang Qu(zq2231)
 
